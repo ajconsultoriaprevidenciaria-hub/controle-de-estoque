@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Estoque - Postos de Combustível</title>
+<style>
+:root {
+  --bg: #0f172a; --surface: #1e293b; --card: #334155;
+  --accent: #3b82f6; --accent2: #8b5cf6; --green: #22c55e; --yellow: #eab308;
+  --orange: #f97316; --red: #ef4444; --cyan: #06b6d4;
+  --text: #f1f5f9; --muted: #94a3b8; --border: #475569;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* HEADER */
+.header { background:linear-gradient(135deg,#1e3a5f,#0f172a); padding:16px 24px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.header h1 { font-size:1.3rem; font-weight:700; }
+.header h1 span { color:var(--accent); }
+.header-right { margin-left:auto; display:flex; gap:10px; align-items:center; }
+
+/* SELECT */
+select, input, button { font-family:inherit; font-size:.9rem; }
+select { background:var(--card); color:var(--text); border:1px solid var(--border); padding:8px 12px; border-radius:8px; cursor:pointer; outline:none; }
+select:focus { border-color:var(--accent); }
+
+/* NAVIGATION TABS */
+.tabs { display:flex; gap:4px; padding:12px 24px; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; }
+.tab { padding:8px 18px; border-radius:8px; cursor:pointer; font-weight:600; font-size:.85rem; border:none; background:transparent; color:var(--muted); transition:all .2s; white-space:nowrap; }
+.tab:hover { color:var(--text); background:var(--card); }
+.tab.active { background:var(--accent); color:#fff; }
+
+/* MAIN */
+.main { padding:20px 24px; max-width:1400px; margin:0 auto; }
+.section { display:none; }
+.section.active { display:block; }
+
+/* CARDS GRID */
+.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:24px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; transition:transform .15s; }
+.card:hover { transform:translateY(-2px); }
+.card-label { font-size:.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:4px; }
+.card-value { font-size:1.8rem; font-weight:700; }
+.card-sub { font-size:.8rem; color:var(--muted); margin-top:4px; }
+
+/* TANK CARDS */
+.tank-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+.tank-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.tank-name { font-weight:700; font-size:1.05rem; }
+.tank-badge { padding:4px 10px; border-radius:20px; font-size:.75rem; font-weight:600; }
+.badge-ok { background:rgba(34,197,94,.15); color:var(--green); }
+.badge-warn { background:rgba(234,179,8,.15); color:var(--yellow); }
+.badge-danger { background:rgba(239,68,68,.15); color:var(--red); }
+.badge-over { background:rgba(6,182,212,.15); color:var(--cyan); }
+
+/* PROGRESS BAR */
+.tank-bar-wrap { background:var(--bg); border-radius:8px; height:22px; overflow:hidden; margin:10px 0; position:relative; }
+.tank-bar { height:100%; border-radius:8px; transition:width .4s ease; min-width:2%; }
+.tank-bar-label { position:absolute; right:8px; top:2px; font-size:.75rem; font-weight:600; }
+.tank-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.tank-stat { text-align:center; }
+.tank-stat .val { font-size:1.1rem; font-weight:700; }
+.tank-stat .lbl { font-size:.7rem; color:var(--muted); text-transform:uppercase; }
+
+/* FORMS */
+.form-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
+.form-title { font-size:1.1rem; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.form-row { display:grid; grid-template-columns:repeat(6,minmax(160px,1fr)); gap:12px; margin-bottom:12px; align-items:end; }
+.form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:0; }
+.form-group label { font-size:.75rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; line-height:1.2; }
+.form-group input { min-width:0; }
+.config-tank { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:10px; }
+.config-tank-header { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+.config-tank-header strong { font-size:1rem; }
+.config-tank-header span { white-space:nowrap; }
+input[type="number"], input[type="date"], input[type="text"] {
+  background:var(--bg); color:var(--text); border:1px solid var(--border); padding:10px 12px;
+  border-radius:8px; outline:none; width:100%; transition:border-color .2s;
+}
+input:focus { border-color:var(--accent); }
+input::-webkit-inner-spin-button { opacity:1; }
+
+.btn { padding:10px 22px; border-radius:8px; border:none; font-weight:700; cursor:pointer; font-size:.9rem; transition:all .15s; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:#2563eb; }
+.btn-success { background:var(--green); color:#fff; }
+.btn-success:hover { background:#16a34a; }
+.btn-danger { background:var(--red); color:#fff; }
+.btn-danger:hover { background:#dc2626; }
+.btn-secondary { background:var(--card); color:var(--text); border:1px solid var(--border); }
+.btn-secondary:hover { background:var(--border); }
+.btn-sm { padding:6px 14px; font-size:.8rem; }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
+table { width:100%; border-collapse:collapse; font-size:.85rem; }
+th { background:var(--card); color:var(--muted); font-weight:700; text-transform:uppercase; font-size:.72rem; letter-spacing:.5px; padding:12px; text-align:left; position:sticky; top:0; }
+td { padding:10px 12px; border-top:1px solid var(--border); }
+tr:hover td { background:rgba(59,130,246,.05); }
+.text-right { text-align:right; }
+.text-center { text-align:center; }
+.falta { color:var(--red); font-weight:700; }
+.sobra { color:var(--cyan); font-weight:700; }
+.ok { color:var(--green); }
+
+/* ALERT BANNER */
+.alert-banner { padding:14px 20px; border-radius:10px; margin-bottom:16px; font-weight:600; display:flex; align-items:center; gap:10px; }
+.alert-red { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); color:var(--red); }
+.alert-yellow { background:rgba(234,179,8,.12); border:1px solid rgba(234,179,8,.3); color:var(--yellow); }
+.alert-green { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:var(--green); }
+
+/* MODAL */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; }
+.modal h2 { margin-bottom:16px; font-size:1.2rem; }
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .header { flex-wrap:wrap; }
+  .cards { grid-template-columns:1fr; }
+  .form-row { grid-template-columns:1fr; }
+  .tank-stats { grid-template-columns:1fr 1fr; }
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* EMPTY STATE */
+.empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+.empty-state .icon { font-size:3rem; margin-bottom:12px; }
+.empty-state p { font-size:1rem; }
+
+/* TOAST */
+.toast { position:fixed; bottom:24px; right:24px; padding:14px 22px; border-radius:10px; font-weight:600; font-size:.9rem; z-index:300; transform:translateY(80px); opacity:0; transition:all .3s; }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast-success { background:var(--green); color:#fff; }
+.toast-error { background:var(--red); color:#fff; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>⛽ <span>Controle de Estoque</span> — Postos de Combustível</h1>
+  <div class="header-right">
+    <select id="selPosto" onchange="onPostoChange()">
+      <option value="">Selecione o Posto</option>
+    </select>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs" id="tabsBar">
+  <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="tab" data-tab="lancamento" onclick="switchTab('lancamento')">📝 Lançamento Diário</button>
+  <button class="tab" data-tab="historico" onclick="switchTab('historico')">📋 Histórico</button>
+  <button class="tab" data-tab="analise" onclick="switchTab('analise')">🔍 Análise de Faltas</button>
+  <button class="tab" data-tab="config" onclick="switchTab('config')">⚙️ Configurar Posto</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- NO POSTO SELECTED -->
+  <div id="noPosto" class="empty-state">
+    <div class="icon">⛽</div>
+    <p>Selecione um posto de combustível para começar</p>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="section" id="sec-dashboard">
+    <div id="dashAlerts"></div>
+    <div class="cards" id="dashCards"></div>
+    <div id="dashTanks"></div>
+  </div>
+
+  <!-- LANCAMENTO DIARIO -->
+  <div class="section" id="sec-lancamento">
+    <div class="form-section">
+      <div class="form-title">📝 Lançamento Diário de Estoque</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="lancData">
+        </div>
+      </div>
+      <div id="lancTanksForm"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="salvarLancamento()">💾 Salvar Lançamento</button>
+        <button class="btn btn-secondary" onclick="limparFormLanc()">🗑️ Limpar</button>
+      </div>
+    </div>
+    <div id="lancPreview"></div>
+  </div>
+
+  <!-- HISTORICO -->
+  <div class="section" id="sec-historico">
+    <div class="form-section" style="padding:16px;">
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+        <div class="form-group">
+          <label>De</label>
+          <input type="date" id="histDe">
+        </div>
+        <div class="form-group">
+          <label>Até</label>
+          <input type="date" id="histAte">
+        </div>
+        <div class="form-group">
+          <label>Tanque</label>
+          <select id="histTanque"><option value="all">Todos</option></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="renderHistorico()">Filtrar</button>
+      </div>
+    </div>
+    <div class="table-wrap" id="histTable"></div>
+  </div>
+
+  <!-- ANALISE DE FALTAS -->
+  <div class="section" id="sec-analise">
+    <div id="analiseContent"></div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="section" id="sec-config">
+    <div class="form-section">
+      <div class="form-title">⚙️ Configuração do Posto</div>
+      <div class="form-group" style="max-width:400px;margin-bottom:16px;">
+        <label>Nome do posto</label>
+        <input type="text" id="cfgNomePosto" placeholder="Ex: Mega Posto São Domingos">
+      </div>
+      <div id="cfgTanks"></div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="addTanque()">+ Adicionar Tanque</button>
+        <button class="btn btn-primary" onclick="salvarConfig()">💾 Salvar Configuração</button>
+      </div>
+    </div>
+    <div class="form-section" style="margin-top:16px;">
+      <div class="form-title">➕ Adicionar Novo Posto</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome do novo posto</label>
+          <input type="text" id="novoPostoNome" placeholder="Ex: Posto Filadelfia">
+        </div>
+      </div>
+      <button class="btn btn-success" onclick="criarNovoPosto()" style="margin-top:8px;">🏗️ Criar Posto</button>
+    </div>
+    <div class="form-section" style="margin-top:16px;">
+      <div class="form-title" style="color:var(--red);">🗑️ Excluir Posto</div>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px;">Esta ação removerá todos os dados do posto selecionado.</p>
+      <button class="btn btn-danger" onclick="excluirPosto()">Excluir Posto Atual</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA LAYER - localStorage
+// ============================================================
+const STORAGE_KEY = 'ctrl_estoque_v2';
+
+const POSTOS_PADRAO = [
+  "Mega Posto São Domingos - Teofilândia",
+  "Posto Salvador", "Posto Aratuípe", "Posto Candeias", "Posto Candiba",
+  "Posto Capim Grosso - Ferrari", "Posto Capim Grosso - Kury", "Posto Caravelas",
+  "Posto Conde - Coqueiral", "Posto Crisópolis", "Posto Maracas",
+  "Posto Dias D'Ávila", "Posto Estrada de Terra Nova", "Posto Filadelfia",
+  "Posto Gongogi", "Posto Guanambi", "Posto Ipirá", "Posto Ituberá",
+  "Posto Jequié", "Posto Paratinga", "Posto Salvador - Orla Boca do Rio",
+  "Posto Sátiro Dias", "Posto Serra do Ramalho", "Posto Sítio do Conde",
+  "Posto Teolândia", "Posto Trevo Valença", "Posto Valença", "Posto Vila do Conde"
+];
+
+const TANQUES_PADRAO = [
+  { nome: "Tanque 1 - Gasolina Comum", combustivel: "Gasolina Comum", capacidade: 10000 },
+  { nome: "Tanque 2 - Gasolina Comum", combustivel: "Gasolina Comum", capacidade: 10000 },
+  { nome: "Tanque 3 - Diesel S500", combustivel: "Diesel S500", capacidade: 15000 },
+  { nome: "Tanque 4 - Diesel S10", combustivel: "Diesel S10", capacidade: 15000 },
+  { nome: "Tanque 5 - Etanol Hidratado", combustivel: "Etanol Hidratado", capacidade: 5000 },
+];
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function getPostos() {
+  const data = loadData();
+  if (!data.postos || Object.keys(data.postos).length === 0) {
+    data.postos = {};
+    POSTOS_PADRAO.forEach(p => {
+      data.postos[p] = { tanques: JSON.parse(JSON.stringify(TANQUES_PADRAO)), lancamentos: [] };
+    });
+    saveData(data);
+  }
+  return data;
+}
+function getPosto(nome) {
+  const data = getPostos();
+  return data.postos[nome] || null;
+}
+function savePosto(nome, posto) {
+  const data = getPostos();
+  data.postos[nome] = posto;
+  saveData(data);
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let currentPosto = '';
+let tempTanques = [];
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  populatePostoSelect();
+  const saved = localStorage.getItem('ctrl_estoque_lastPosto');
+  if (saved) {
+    const sel = document.getElementById('selPosto');
+    if ([...sel.options].some(o => o.value === saved)) {
+      sel.value = saved;
+      onPostoChange();
+    }
+  }
+  document.getElementById('lancData').value = new Date().toISOString().slice(0, 10);
+}
+
+function populatePostoSelect() {
+  const data = getPostos();
+  const sel = document.getElementById('selPosto');
+  sel.innerHTML = '<option value="">Selecione o Posto</option>';
+  Object.keys(data.postos).sort().forEach(nome => {
+    const opt = document.createElement('option');
+    opt.value = nome; opt.textContent = nome;
+    sel.appendChild(opt);
+  });
+}
+
+function onPostoChange() {
+  currentPosto = document.getElementById('selPosto').value;
+  localStorage.setItem('ctrl_estoque_lastPosto', currentPosto);
+  if (!currentPosto) {
+    document.getElementById('noPosto').style.display = '';
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    return;
+  }
+  document.getElementById('noPosto').style.display = 'none';
+  switchTab('dashboard');
+}
+
+function switchTab(tab) {
+  if (!currentPosto && tab !== 'config') return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-' + tab));
+  if (currentPosto || tab === 'config') {
+    const renders = { dashboard: renderDashboard, lancamento: renderLancForm, historico: renderHistorico, analise: renderAnalise, config: renderConfig };
+    if (renders[tab]) renders[tab]();
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('pt-BR'); }
+function fmtL(n) { return fmt(n) + ' L'; }
+function pct(val, cap) { return cap > 0 ? Math.min(100, Math.max(0, (val / cap) * 100)).toFixed(1) : 0; }
+function barColor(p) { return p > 60 ? 'var(--green)' : p > 30 ? 'var(--yellow)' : p > 10 ? 'var(--orange)' : 'var(--red)'; }
+
+function getUltimoLancamento(posto, tanqueIdx) {
+  if (!posto || !posto.lancamentos) return null;
+  const sorted = [...posto.lancamentos].filter(l => l.tanques && l.tanques[tanqueIdx] !== undefined).sort((a, b) => b.data.localeCompare(a.data));
+  return sorted[0] || null;
+}
+
+function getEstoqueAtual(posto, tanqueIdx) {
+  const ult = getUltimoLancamento(posto, tanqueIdx);
+  if (!ult) return 0;
+  const t = ult.tanques[tanqueIdx];
+  return t.leituraFisica != null && t.leituraFisica !== '' ? Number(t.leituraFisica) : Number(t.fechamento);
+}
+
+function getAberturaParaData(posto, tanqueIdx, dataStr) {
+  if (!posto || !posto.lancamentos) return 0;
+  const anteriores = posto.lancamentos
+    .filter(l => l.data < dataStr && l.tanques && l.tanques[tanqueIdx] !== undefined)
+    .sort((a, b) => b.data.localeCompare(a.data));
+  if (anteriores.length === 0) return 0;
+  const t = anteriores[0].tanques[tanqueIdx];
+  return t.leituraFisica != null && t.leituraFisica !== '' ? Number(t.leituraFisica) : Number(t.fechamento);
+}
+
+function calcFechamento(abertura, vendas, descarga) {
+  return (Number(abertura) || 0) - (Number(vendas) || 0) + (Number(descarga) || 0);
+}
+
+function calcDiferenca(fechamento, leituraFisica) {
+  if (leituraFisica == null || leituraFisica === '') return null;
+  return Number(leituraFisica) - Number(fechamento);
+}
+
+function classifDiferenca(dif) {
+  if (dif == null) return { label: '—', cls: '', badge: '' };
+  if (dif < -500) return { label: '🔴 FALTA GRAVE', cls: 'falta', badge: 'badge-danger' };
+  if (dif < -100) return { label: '🟠 FALTA', cls: 'falta', badge: 'badge-warn' };
+  if (dif < 0) return { label: '🟡 TOLERÂNCIA', cls: 'ok', badge: 'badge-ok' };
+  if (dif > 100) return { label: '🔵 SOBRA', cls: 'sobra', badge: 'badge-over' };
+  return { label: '✅ OK', cls: 'ok', badge: 'badge-ok' };
+}
+
+function showToast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.className = 'toast toast-' + type + ' show';
+  el.textContent = msg;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const posto = getPosto(currentPosto);
+  if (!posto) return;
+  const tanques = posto.tanques || [];
+  let alertsHtml = '';
+  let cardsHtml = '';
+  let tanksHtml = '';
+
+  let totalEstoque = 0, totalCapacidade = 0, totalFalta = 0, diasComFalta = 0;
+
+  const lancamentos = (posto.lancamentos || []).slice(-30);
+  lancamentos.forEach(l => {
+    let temFalta = false;
+    if (l.tanques) Object.values(l.tanques).forEach(t => {
+      const dif = calcDiferenca(t.fechamento, t.leituraFisica);
+      if (dif !== null && dif < -100) temFalta = true;
+    });
+    if (temFalta) diasComFalta++;
+  });
+
+  tanques.forEach((tq, i) => {
+    const estoque = getEstoqueAtual(posto, i);
+    const cap = tq.capacidade || 1;
+    const perc = pct(estoque, cap);
+    const p = parseFloat(perc);
+    const cor = barColor(p);
+
+    totalEstoque += estoque;
+    totalCapacidade += cap;
+
+    const ult = getUltimoLancamento(posto, i);
+    let dif = null, classif = { label: '—', badge: '' };
+    if (ult && ult.tanques[i]) {
+      dif = calcDiferenca(ult.tanques[i].fechamento, ult.tanques[i].leituraFisica);
+      classif = classifDiferenca(dif);
+      if (dif !== null && dif < 0) totalFalta += Math.abs(dif);
+    }
+
+    if (dif !== null && dif < -500) {
+      alertsHtml += `<div class="alert-banner alert-red">⚠️ FALTA GRAVE no ${tq.nome}: ${fmtL(dif)} (último lançamento)</div>`;
+    }
+
+    tanksHtml += `
+    <div class="tank-card">
+      <div class="tank-header">
+        <div>
+          <div class="tank-name">⛽ ${tq.nome}</div>
+          <div style="color:var(--muted);font-size:.8rem;">${tq.combustivel} • Capacidade: ${fmtL(cap)}</div>
+        </div>
+        <span class="tank-badge ${classif.badge}">${classif.label}</span>
+      </div>
+      <div class="tank-bar-wrap">
+        <div class="tank-bar" style="width:${perc}%;background:${cor};"></div>
+        <div class="tank-bar-label">${perc}%</div>
+      </div>
+      <div class="tank-stats">
+        <div class="tank-stat"><div class="val">${fmtL(estoque)}</div><div class="lbl">Estoque Atual</div></div>
+        <div class="tank-stat"><div class="val">${fmtL(cap - estoque)}</div><div class="lbl">Disponível</div></div>
+        <div class="tank-stat"><div class="val" style="color:${dif != null && dif < 0 ? 'var(--red)' : dif != null && dif > 0 ? 'var(--cyan)' : 'var(--muted)'}">${dif != null ? fmtL(dif) : '—'}</div><div class="lbl">Última Diferença</div></div>
+      </div>
+    </div>`;
+  });
+
+  if (!alertsHtml && totalFalta === 0) {
+    alertsHtml = `<div class="alert-banner alert-green">✅ Nenhuma falta grave detectada nos últimos lançamentos</div>`;
+  }
+
+  cardsHtml = `
+    <div class="card"><div class="card-label">Estoque Total</div><div class="card-value" style="color:var(--accent)">${fmtL(totalEstoque)}</div><div class="card-sub">de ${fmtL(totalCapacidade)} de capacidade</div></div>
+    <div class="card"><div class="card-label">Tanques Ativos</div><div class="card-value" style="color:var(--accent2)">${tanques.length}</div><div class="card-sub">configurados neste posto</div></div>
+    <div class="card"><div class="card-label">Total Faltas (último lanç.)</div><div class="card-value" style="color:${totalFalta > 0 ? 'var(--red)' : 'var(--green)'}">${fmtL(totalFalta)}</div><div class="card-sub">soma das diferenças negativas</div></div>
+    <div class="card"><div class="card-label">Dias com Falta (30d)</div><div class="card-value" style="color:${diasComFalta > 0 ? 'var(--orange)' : 'var(--green)'}">${diasComFalta}</div><div class="card-sub">dias com diferença > 100L</div></div>
+  `;
+
+  document.getElementById('dashAlerts').innerHTML = alertsHtml;
+  document.getElementById('dashCards').innerHTML = cardsHtml;
+  document.getElementById('dashTanks').innerHTML = tanksHtml;
+}
+
+// ============================================================
+// LANÇAMENTO DIÁRIO
+// ============================================================
+function renderLancForm() {
+  const posto = getPosto(currentPosto);
+  if (!posto) return;
+  const tanques = posto.tanques || [];
+  const dataInput = document.getElementById('lancData').value;
+
+  const existing = (posto.lancamentos || []).find(l => l.data === dataInput);
+
+  let html = '';
+  tanques.forEach((tq, i) => {
+    const aberturaCalculada = getAberturaParaData(posto, i, dataInput);
+    const ex = existing && existing.tanques[i] ? existing.tanques[i] : null;
+
+    html += `
+    <div class="config-tank" style="margin-top:12px;">
+      <div class="config-tank-header">
+        <strong>⛽ ${tq.nome}</strong>
+        <span style="color:var(--muted);font-size:.8rem;">Abertura (leit. física dia anterior): ${fmtL(aberturaCalculada)}</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>📥 Abertura Medida de Vara (L)</label>
+          <input type="number" id="lanc_ab_${i}" value="${ex ? ex.abertura : aberturaCalculada}" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label>🔻 Vendas (L)</label>
+          <input type="number" id="lanc_vd_${i}" value="${ex ? ex.vendas : ''}" placeholder="0" step="0.01" min="0" oninput="calcPreview(${i})">
+        </div>
+        <div class="form-group">
+          <label>🚛 Descarga / Carga (L)</label>
+          <input type="number" id="lanc_dc_${i}" value="${ex ? ex.descarga : ''}" placeholder="0" step="0.01" min="0" oninput="calcPreview(${i})">
+        </div>
+        <div class="form-group">
+          <label>📤 Fechamento Calculado</label>
+          <input type="number" id="lanc_fc_${i}" readonly style="opacity:.7;background:var(--card);">
+        </div>
+        <div class="form-group">
+          <label>🔍 Fechamento Medida de Vara (L)</label>
+          <input type="number" id="lanc_lf_${i}" value="${ex && ex.leituraFisica != null ? ex.leituraFisica : ''}" placeholder="Medição real do tanque" step="0.01" min="0" oninput="calcPreview(${i})">
+        </div>
+        <div class="form-group">
+          <label>⚠️ Diferença</label>
+          <input type="text" id="lanc_df_${i}" readonly style="opacity:.7;background:var(--card);font-weight:700;">
+        </div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('lancTanksForm').innerHTML = html;
+
+  tanques.forEach((_, i) => calcPreview(i));
+}
+
+function calcPreview(idx) {
+  const ab = Number(document.getElementById(`lanc_ab_${idx}`)?.value) || 0;
+  const vd = Number(document.getElementById(`lanc_vd_${idx}`)?.value) || 0;
+  const dc = Number(document.getElementById(`lanc_dc_${idx}`)?.value) || 0;
+  const lf = document.getElementById(`lanc_lf_${idx}`)?.value;
+  const fech = calcFechamento(ab, vd, dc);
+
+  const fcEl = document.getElementById(`lanc_fc_${idx}`);
+  if (fcEl) fcEl.value = fech.toFixed(2);
+
+  const dfEl = document.getElementById(`lanc_df_${idx}`);
+  if (dfEl) {
+    if (lf !== '' && lf != null) {
+      const dif = Number(lf) - fech;
+      const classif = classifDiferenca(dif);
+      dfEl.value = `${dif >= 0 ? '+' : ''}${dif.toFixed(2)} L — ${classif.label}`;
+      dfEl.style.color = dif < -100 ? 'var(--red)' : dif < 0 ? 'var(--yellow)' : dif > 100 ? 'var(--cyan)' : 'var(--green)';
+    } else {
+      dfEl.value = 'Sem leitura física';
+      dfEl.style.color = 'var(--muted)';
+    }
+  }
+}
+
+function salvarLancamento() {
+  const data = document.getElementById('lancData').value;
+  if (!data) { showToast('Informe a data!', 'error'); return; }
+  if (!currentPosto) return;
+
+  const posto = getPosto(currentPosto);
+  const tanques = posto.tanques || [];
+  const lancTanques = {};
+
+  for (let i = 0; i < tanques.length; i++) {
+    const ab = Number(document.getElementById(`lanc_ab_${i}`)?.value) || 0;
+    const vd = Number(document.getElementById(`lanc_vd_${i}`)?.value) || 0;
+    const dc = Number(document.getElementById(`lanc_dc_${i}`)?.value) || 0;
+    const lfVal = document.getElementById(`lanc_lf_${i}`)?.value;
+    const fech = calcFechamento(ab, vd, dc);
+    const lf = lfVal !== '' && lfVal != null ? Number(lfVal) : null;
+
+    lancTanques[i] = { abertura: ab, vendas: vd, descarga: dc, fechamento: fech, leituraFisica: lf };
+  }
+
+  if (!posto.lancamentos) posto.lancamentos = [];
+
+  const existIdx = posto.lancamentos.findIndex(l => l.data === data);
+  const lanc = { data, tanques: lancTanques };
+  if (existIdx >= 0) {
+    posto.lancamentos[existIdx] = lanc;
+  } else {
+    posto.lancamentos.push(lanc);
+  }
+  posto.lancamentos.sort((a, b) => a.data.localeCompare(b.data));
+
+  savePosto(currentPosto, posto);
+  showToast('Lançamento salvo com sucesso!');
+  renderLancForm();
+}
+
+function limparFormLanc() {
+  const posto = getPosto(currentPosto);
+  if (!posto) return;
+  posto.tanques.forEach((_, i) => {
+    ['vd', 'dc', 'lf'].forEach(f => {
+      const el = document.getElementById(`lanc_${f}_${i}`);
+      if (el) el.value = '';
+    });
+    calcPreview(i);
+  });
+}
+
+document.getElementById('lancData').addEventListener('change', () => {
+  if (currentPosto) renderLancForm();
+});
+
+// ============================================================
+// HISTÓRICO
+// ============================================================
+function renderHistorico() {
+  const posto = getPosto(currentPosto);
+  if (!posto) return;
+  const tanques = posto.tanques || [];
+  const de = document.getElementById('histDe').value;
+  const ate = document.getElementById('histAte').value;
+  const filtroTanque = document.getElementById('histTanque').value;
+
+  const selT = document.getElementById('histTanque');
+  if (selT.options.length <= 1) {
+    tanques.forEach((tq, i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = tq.nome;
+      selT.appendChild(o);
+    });
+  }
+
+  let lancamentos = [...(posto.lancamentos || [])].sort((a, b) => b.data.localeCompare(a.data));
+  if (de) lancamentos = lancamentos.filter(l => l.data >= de);
+  if (ate) lancamentos = lancamentos.filter(l => l.data <= ate);
+
+  if (lancamentos.length === 0) {
+    document.getElementById('histTable').innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>Nenhum lançamento encontrado</p></div>';
+    return;
+  }
+
+  const showTanques = filtroTanque === 'all' ? tanques.map((_, i) => i) : [Number(filtroTanque)];
+
+  let html = '<table><thead><tr><th>Data</th>';
+  showTanques.forEach(i => {
+    const tq = tanques[i];
+    if (tq) html += `<th class="text-right">Abertura</th><th class="text-right">Vendas</th><th class="text-right">Descarga</th><th class="text-right">Fecham.</th><th class="text-right">Fecham. Vara</th><th class="text-right">Diferença</th>`;
+  });
+  html += '</tr>';
+  if (showTanques.length > 1) {
+    html += '<tr>';
+    html += '<th></th>';
+    showTanques.forEach(i => {
+      const tq = tanques[i];
+      if (tq) html += `<th colspan="6" style="text-align:center;color:var(--accent);font-size:.7rem;">${tq.nome}</th>`;
+    });
+    html += '</tr>';
+  }
+  html += '</thead><tbody>';
+
+  lancamentos.forEach(l => {
+    html += `<tr><td style="white-space:nowrap;">${formatDate(l.data)}</td>`;
+    showTanques.forEach(i => {
+      const t = l.tanques && l.tanques[i] ? l.tanques[i] : {};
+      const fech = t.fechamento != null ? t.fechamento : '';
+      const dif = calcDiferenca(t.fechamento, t.leituraFisica);
+      const classif = classifDiferenca(dif);
+      html += `<td class="text-right">${fmt(t.abertura)}</td>`;
+      html += `<td class="text-right">${fmt(t.vendas)}</td>`;
+      html += `<td class="text-right" style="color:var(--cyan)">${t.descarga ? fmt(t.descarga) : '—'}</td>`;
+      html += `<td class="text-right">${fmt(fech)}</td>`;
+      html += `<td class="text-right">${t.leituraFisica != null ? fmt(t.leituraFisica) : '—'}</td>`;
+      html += `<td class="text-right ${classif.cls}">${dif != null ? (dif >= 0 ? '+' : '') + fmt(dif) : '—'}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('histTable').innerHTML = html;
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+// ============================================================
+// ANÁLISE DE FALTAS
+// ============================================================
+function renderAnalise() {
+  const posto = getPosto(currentPosto);
+  if (!posto) return;
+  const tanques = posto.tanques || [];
+  const lancamentos = [...(posto.lancamentos || [])].sort((a, b) => b.data.localeCompare(a.data));
+
+  if (lancamentos.length === 0) {
+    document.getElementById('analiseContent').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>Nenhum lançamento para análise</p></div>';
+    return;
+  }
+
+  let summaryHtml = '<div class="cards" style="margin-bottom:20px;">';
+  tanques.forEach((tq, i) => {
+    let totalFalta = 0, count = 0, comDescarga = 0, faltaComDescarga = 0;
+    lancamentos.forEach(l => {
+      if (!l.tanques || !l.tanques[i]) return;
+      const t = l.tanques[i];
+      const dif = calcDiferenca(t.fechamento, t.leituraFisica);
+      if (dif !== null && dif < 0) { totalFalta += Math.abs(dif); count++; }
+      if (t.descarga > 0) {
+        comDescarga++;
+        if (dif !== null && dif < -100) faltaComDescarga++;
+      }
+    });
+    summaryHtml += `
+    <div class="card">
+      <div class="card-label">${tq.nome}</div>
+      <div class="card-value" style="color:${totalFalta > 0 ? 'var(--red)' : 'var(--green)'}">${fmtL(totalFalta)}</div>
+      <div class="card-sub">${count} dias com falta | ${faltaComDescarga} faltas durante descarga</div>
+    </div>`;
+  });
+  summaryHtml += '</div>';
+
+  let tableHtml = `<div class="form-section" style="padding:16px;margin-bottom:16px;">
+    <div class="form-title">🔍 Detalhamento — Dias com Diferença</div>
+    <p style="color:var(--muted);font-size:.82rem;margin-bottom:12px;">
+      🔴 FALTA GRAVE &gt; 500L &nbsp;&nbsp; 🟠 FALTA 100–500L &nbsp;&nbsp; 🟡 TOLERÂNCIA 0–100L &nbsp;&nbsp; 🔵 SOBRA &gt; 100L &nbsp;&nbsp;
+      <strong style="color:var(--orange);">⚠️ Faltas durante descarga podem indicar furto!</strong>
+    </p>
+  </div>`;
+
+  tableHtml += '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Teve Descarga?</th>';
+  tanques.forEach(tq => tableHtml += `<th class="text-right">${tq.combustivel}</th>`);
+  tableHtml += '<th class="text-right">Falta Total</th><th class="text-right">Desc. Total</th><th class="text-right">% Falta/Desc.</th><th>Classificação</th></tr></thead><tbody>';
+
+  lancamentos.forEach(l => {
+    let faltaTotal = 0, descTotal = 0, temDescarga = false, temDif = false;
+    const difs = [];
+
+    tanques.forEach((tq, i) => {
+      if (!l.tanques || !l.tanques[i]) { difs.push(null); return; }
+      const t = l.tanques[i];
+      const dif = calcDiferenca(t.fechamento, t.leituraFisica);
+      difs.push(dif);
+      if (dif !== null) temDif = true;
+      if (dif !== null && dif < 0) faltaTotal += Math.abs(dif);
+      if (t.descarga > 0) { descTotal += t.descarga; temDescarga = true; }
+    });
+
+    if (!temDif) return;
+
+    const pctFalta = descTotal > 0 ? ((faltaTotal / descTotal) * 100).toFixed(1) : '—';
+    const maxFalta = Math.min(...difs.filter(d => d !== null));
+    const classifGeral = classifDiferenca(maxFalta < 0 ? maxFalta : (faltaTotal > 0 ? -faltaTotal : 0));
+
+    tableHtml += `<tr>
+      <td style="white-space:nowrap;">${formatDate(l.data)}</td>
+      <td class="text-center">${temDescarga ? '<span style="color:var(--cyan);">🚛 SIM</span>' : '—'}</td>`;
+
+    difs.forEach(dif => {
+      if (dif === null) {
+        tableHtml += '<td class="text-right" style="color:var(--muted);">—</td>';
+      } else {
+        const c = classifDiferenca(dif);
+        tableHtml += `<td class="text-right ${c.cls}">${(dif >= 0 ? '+' : '') + fmt(dif)}</td>`;
+      }
+    });
+
+    tableHtml += `
+      <td class="text-right falta">${faltaTotal > 0 ? '-' + fmt(faltaTotal) : '—'}</td>
+      <td class="text-right" style="color:var(--cyan)">${descTotal > 0 ? fmt(descTotal) : '—'}</td>
+      <td class="text-right" style="color:${pctFalta !== '—' && parseFloat(pctFalta) > 2 ? 'var(--red)' : 'var(--muted)'}">${pctFalta !== '—' ? pctFalta + '%' : '—'}</td>
+      <td><span class="tank-badge ${classifGeral.badge}">${classifGeral.label}${temDescarga && faltaTotal > 100 ? ' ⚠️ DESCARGA' : ''}</span></td>
+    </tr>`;
+  });
+
+  tableHtml += '</tbody></table></div>';
+
+  document.getElementById('analiseContent').innerHTML = summaryHtml + tableHtml;
+}
+
+// ============================================================
+// CONFIGURAÇÃO
+// ============================================================
+function renderConfig() {
+  const posto = getPosto(currentPosto);
+  if (!posto) return;
+  tempTanques = JSON.parse(JSON.stringify(posto.tanques || []));
+  document.getElementById('cfgNomePosto').value = currentPosto;
+  renderConfigTanks();
+}
+
+function renderConfigTanks() {
+  let html = '';
+  tempTanques.forEach((tq, i) => {
+    html += `
+    <div class="config-tank">
+      <div class="config-tank-header">
+        <strong>Tanque ${i + 1}</strong>
+        <button class="btn btn-danger btn-sm" onclick="removeTanque(${i})">Remover</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" value="${tq.nome}" onchange="tempTanques[${i}].nome=this.value">
+        </div>
+        <div class="form-group">
+          <label>Combustível</label>
+          <select onchange="tempTanques[${i}].combustivel=this.value">
+            ${['Gasolina Comum','Gasolina Aditivada','Diesel S500','Diesel S10','Etanol Hidratado','Etanol Anidro','GNV'].map(c => `<option ${tq.combustivel === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Capacidade aferida em Litros (L)</label>
+          <input type="text" id="cap_${i}" data-idx="${i}" value="${Number(tq.capacidade || 0).toLocaleString('pt-BR')}">
+        </div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('cfgTanks').innerHTML = html;
+  
+  // Adicionar event listeners aos campos de capacidade
+  setTimeout(() => {
+    document.querySelectorAll('[id^="cap_"]').forEach(input => {
+      input.addEventListener('focus', function() {
+        this.value = this.value.replace(/\./g, '');
+      });
+      input.addEventListener('blur', function() {
+        const idx = parseInt(this.getAttribute('data-idx'));
+        const raw = this.value.replace(/\./g, '');
+        const num = Number(raw || 0);
+        if (tempTanques[idx]) {
+          tempTanques[idx].capacidade = num;
+        }
+        this.value = num.toLocaleString('pt-BR');
+      });
+    });
+  }, 0);
+}
+
+function addTanque() {
+  const n = tempTanques.length + 1;
+  tempTanques.push({ nome: `Tanque ${n}`, combustivel: 'Gasolina Comum', capacidade: 10000 });
+  renderConfigTanks();
+}
+
+function removeTanque(idx) {
+  tempTanques.splice(idx, 1);
+  renderConfigTanks();
+}
+
+function salvarConfig() {
+  const novoNome = document.getElementById('cfgNomePosto').value.trim();
+  if (!novoNome) { showToast('Informe o nome do posto!', 'error'); return; }
+  if (tempTanques.length === 0) { showToast('Adicione pelo menos 1 tanque!', 'error'); return; }
+
+  console.log('=== ANTES DE CAPTURAR ===');
+  console.log('tempTanques:', JSON.stringify(tempTanques));
+
+  // Capturar valores atuais dos campos de capacidade antes de salvar
+  const tanques = document.querySelectorAll('[id^="cap_"]');
+  console.log('Campos encontrados:', tanques.length);
+  
+  tanques.forEach((input) => {
+    const idx = parseInt(input.id.split('_')[1]);
+    const raw = input.value.replace(/\./g, '');
+    const num = Number(raw || 0);
+    console.log(`cap_${idx}: raw="${input.value}" -> num=${num}`);
+    if (tempTanques[idx]) tempTanques[idx].capacidade = num;
+  });
+
+  console.log('=== DEPOIS DE CAPTURAR ===');
+  console.log('tempTanques:', JSON.stringify(tempTanques));
+
+  const data = getPostos();
+  console.log('Data antes de salvar:', JSON.stringify(data.postos[currentPosto].tanques));
+
+  if (novoNome !== currentPosto) {
+    data.postos[novoNome] = data.postos[currentPosto];
+    delete data.postos[currentPosto];
+    currentPosto = novoNome;
+    localStorage.setItem('ctrl_estoque_lastPosto', novoNome);
+  }
+
+  data.postos[currentPosto].tanques = JSON.parse(JSON.stringify(tempTanques));
+  console.log('Data depois de atualizar:', JSON.stringify(data.postos[currentPosto].tanques));
+  
+  saveData(data);
+  console.log('Salvado em localStorage:', JSON.stringify(JSON.parse(localStorage.getItem('ctrl_estoque_v2')).postos[currentPosto].tanques));
+  
+  populatePostoSelect();
+  document.getElementById('selPosto').value = currentPosto;
+  showToast('Configuração salva!');
+  renderDashboard();
+}
+
+function criarNovoPosto() {
+  const nome = document.getElementById('novoPostoNome').value.trim();
+  if (!nome) { showToast('Informe o nome do novo posto!', 'error'); return; }
+  const data = getPostos();
+  if (data.postos[nome]) { showToast('Posto já existe!', 'error'); return; }
+  data.postos[nome] = { tanques: JSON.parse(JSON.stringify(TANQUES_PADRAO)), lancamentos: [] };
+  saveData(data);
+  populatePostoSelect();
+  document.getElementById('selPosto').value = nome;
+  document.getElementById('novoPostoNome').value = '';
+  currentPosto = nome;
+  localStorage.setItem('ctrl_estoque_lastPosto', nome);
+  showToast('Posto criado com sucesso!');
+  switchTab('config');
+}
+
+function excluirPosto() {
+  if (!currentPosto) return;
+  if (!confirm(`Tem certeza que deseja excluir "${currentPosto}" e todos os seus dados?`)) return;
+  const data = getPostos();
+  delete data.postos[currentPosto];
+  saveData(data);
+  currentPosto = '';
+  localStorage.removeItem('ctrl_estoque_lastPosto');
+  populatePostoSelect();
+  document.getElementById('selPosto').value = '';
+  onPostoChange();
+  showToast('Posto excluído!');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+init();
+</script>
+</body>
+</html>
