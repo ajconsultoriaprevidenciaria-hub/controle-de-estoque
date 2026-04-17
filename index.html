@@ -146,6 +146,7 @@ tr:hover td { background:rgba(59,130,246,.05); }
 <!-- HEADER -->
 <div class="header">
   <h1>⛽ <span>Controle de Estoque</span> — Postos de Combustível</h1>
+  <button id="btnEstoqueTotal" onclick="switchTab('estoquetotal')" style="margin-left:40px;background:var(--green);color:#fff;border:none;padding:8px 22px;border-radius:50px;font-weight:700;font-size:.85rem;cursor:pointer;transition:all .15s;white-space:nowrap;">📦 Estoque Total</button>
   <div class="header-right">
     <select id="selPosto" onchange="onPostoChange()">
       <option value="">Selecione o Posto</option>
@@ -156,7 +157,6 @@ tr:hover td { background:rgba(59,130,246,.05); }
 <!-- TABS -->
 <div class="tabs" id="tabsBar">
   <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
-  <button class="tab" data-tab="estoquetotal" onclick="switchTab('estoquetotal')">📦 Estoque Total</button>
   <button class="tab" data-tab="lancamento" onclick="switchTab('lancamento')">📝 Lançamento Diário</button>
   <button class="tab" data-tab="historico" onclick="switchTab('historico')">📋 Histórico</button>
   <button class="tab" data-tab="analise" onclick="switchTab('analise')">🔍 Análise de Faltas</button>
@@ -361,8 +361,8 @@ function onPostoChange() {
   }
   document.getElementById('noPosto').style.display = 'none';
   // Se estiver na aba estoque total, manter nela
-  const activeTab = document.querySelector('.tab.active');
-  if (activeTab && activeTab.dataset.tab === 'estoquetotal') {
+  const btnET = document.getElementById('btnEstoqueTotal');
+  if (btnET && btnET.style.boxShadow && btnET.style.boxShadow !== 'none') {
     switchTab('estoquetotal');
   } else {
     switchTab('dashboard');
@@ -373,6 +373,13 @@ function switchTab(tab) {
   if (!currentPosto && tab !== 'config' && tab !== 'estoquetotal') return;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-' + tab));
+  // Destacar botão do cabeçalho
+  const btnET = document.getElementById('btnEstoqueTotal');
+  if (tab === 'estoquetotal') {
+    btnET.style.background = '#16a34a'; btnET.style.boxShadow = '0 0 12px rgba(34,197,94,.5)';
+  } else {
+    btnET.style.background = 'var(--green)'; btnET.style.boxShadow = 'none';
+  }
   if (tab === 'estoquetotal') { renderEstoqueTotal(); return; }
   if (currentPosto || tab === 'config') {
     const renders = { dashboard: renderDashboard, lancamento: renderLancForm, historico: renderHistorico, analise: renderAnalise, config: renderConfig };
