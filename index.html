@@ -156,6 +156,7 @@ tr:hover td { background:rgba(59,130,246,.05); }
 <!-- TABS -->
 <div class="tabs" id="tabsBar">
   <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="tab" data-tab="estoquetotal" onclick="switchTab('estoquetotal')">📦 Estoque Total</button>
   <button class="tab" data-tab="lancamento" onclick="switchTab('lancamento')">📝 Lançamento Diário</button>
   <button class="tab" data-tab="historico" onclick="switchTab('historico')">📋 Histórico</button>
   <button class="tab" data-tab="analise" onclick="switchTab('analise')">🔍 Análise de Faltas</button>
@@ -169,6 +170,11 @@ tr:hover td { background:rgba(59,130,246,.05); }
   <div id="noPosto" class="empty-state">
     <div class="icon">⛽</div>
     <p>Selecione um posto de combustível para começar</p>
+  </div>
+
+  <!-- ESTOQUE TOTAL -->
+  <div class="section" id="sec-estoquetotal">
+    <div id="estoqueTotalContent"></div>
   </div>
 
   <!-- DASHBOARD -->
@@ -354,13 +360,20 @@ function onPostoChange() {
     return;
   }
   document.getElementById('noPosto').style.display = 'none';
-  switchTab('dashboard');
+  // Se estiver na aba estoque total, manter nela
+  const activeTab = document.querySelector('.tab.active');
+  if (activeTab && activeTab.dataset.tab === 'estoquetotal') {
+    switchTab('estoquetotal');
+  } else {
+    switchTab('dashboard');
+  }
 }
 
 function switchTab(tab) {
-  if (!currentPosto && tab !== 'config') return;
+  if (!currentPosto && tab !== 'config' && tab !== 'estoquetotal') return;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-' + tab));
+  if (tab === 'estoquetotal') { renderEstoqueTotal(); return; }
   if (currentPosto || tab === 'config') {
     const renders = { dashboard: renderDashboard, lancamento: renderLancForm, historico: renderHistorico, analise: renderAnalise, config: renderConfig };
     if (renders[tab]) renders[tab]();
@@ -500,9 +513,75 @@ function renderDashboard() {
     <div class="card"><div class="card-label">Dias com Falta (30d)</div><div class="card-value" style="color:${diasComFalta > 0 ? 'var(--orange)' : 'var(--green)'}">${diasComFalta}</div><div class="card-sub">dias com diferença > 100L</div></div>
   `;
 
+  // === RANKING DE MOTORISTAS, CAMINHÕES E PRODUTOS COM MAIS FALTA ===
+  const rankMotorista = {};
+  const rankPlaca = {};
+  const rankProduto = {};
+  const allLanc = posto.lancamentos || [];
+
+  allLanc.forEach(l => {
+    if (!l.tanques) return;
+    Object.keys(l.tanques).forEach(idx => {
+      const t = l.tanques[idx];
+      const dif = calcDiferenca(t.fechamento, t.leituraFisica);
+      if (dif === null || dif >= 0) return;
+      const faltaAbs = Math.abs(dif);
+      // Produto (combustível)
+      const tq = tanques[idx];
+      if (tq) {
+        const comb = tq.combustivel;
+        if (!rankProduto[comb]) rankProduto[comb] = { total: 0, count: 0 };
+        rankProduto[comb].total += faltaAbs;
+        rankProduto[comb].count++;
+      }
+      // Motorista e Placa (somente se teve descarga)
+      if (t.descarga > 0) {
+        if (t.motorista) {
+          if (!rankMotorista[t.motorista]) rankMotorista[t.motorista] = { total: 0, count: 0 };
+          rankMotorista[t.motorista].total += faltaAbs;
+          rankMotorista[t.motorista].count++;
+        }
+        if (t.placa) {
+          if (!rankPlaca[t.placa]) rankPlaca[t.placa] = { total: 0, count: 0 };
+          rankPlaca[t.placa].total += faltaAbs;
+          rankPlaca[t.placa].count++;
+        }
+      }
+    });
+  });
+
+  function buildRankTable(rankObj, labelCol) {
+    const sorted = Object.entries(rankObj).sort((a, b) => b[1].total - a[1].total);
+    if (sorted.length === 0) return '<div style="color:var(--muted);padding:12px;text-align:center;">Sem dados registrados</div>';
+    let h = '<div class="table-wrap"><table><thead><tr><th>#</th><th>' + labelCol + '</th><th class="text-right">Falta Total (L)</th><th class="text-right">Ocorrências</th></tr></thead><tbody>';
+    sorted.forEach(([nome, v], idx) => {
+      h += `<tr><td style="font-weight:700;color:${idx === 0 ? 'var(--red)' : idx < 3 ? 'var(--orange)' : 'var(--muted)'}">${idx + 1}º</td><td>${nome}</td><td class="text-right falta">${fmtL(v.total)}</td><td class="text-right">${v.count}</td></tr>`;
+    });
+    h += '</tbody></table></div>';
+    return h;
+  }
+
+  let rankHtml = `
+  <div style="margin-top:24px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
+      <div class="form-section" style="padding:16px;">
+        <div class="form-title">👤 Rank Motoristas — Campeões de Falta</div>
+        ${buildRankTable(rankMotorista, 'Motorista')}
+      </div>
+      <div class="form-section" style="padding:16px;">
+        <div class="form-title">🚛 Rank Caminhões (Placas) — Campeões de Falta</div>
+        ${buildRankTable(rankPlaca, 'Placa')}
+      </div>
+      <div class="form-section" style="padding:16px;">
+        <div class="form-title">⛽ Rank Produtos — Mais Faltam</div>
+        ${buildRankTable(rankProduto, 'Combustível')}
+      </div>
+    </div>
+  </div>`;
+
   document.getElementById('dashAlerts').innerHTML = alertsHtml;
   document.getElementById('dashCards').innerHTML = cardsHtml;
-  document.getElementById('dashTanks').innerHTML = tanksHtml;
+  document.getElementById('dashTanks').innerHTML = tanksHtml + rankHtml;
 }
 
 // ============================================================
@@ -541,7 +620,17 @@ function renderLancForm() {
           <input type="number" id="lanc_dc_${i}" value="${ex ? ex.descarga : ''}" placeholder="0" step="0.01" min="0" oninput="calcPreview(${i})">
         </div>
         <div class="form-group">
-          <label>📤 Fechamento Calculado</label>
+          <label>� Placa do Caminhão</label>
+          <input type="text" id="lanc_pl_${i}" value="${ex && ex.placa ? ex.placa : ''}" placeholder="ABC-1D23" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>👤 Motorista</label>
+          <input type="text" id="lanc_mt_${i}" value="${ex && ex.motorista ? ex.motorista : ''}" placeholder="Nome do motorista">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>�📤 Fechamento Calculado</label>
           <input type="number" id="lanc_fc_${i}" readonly style="opacity:.7;background:var(--card);">
         </div>
         <div class="form-group">
@@ -601,7 +690,9 @@ function salvarLancamento() {
     const fech = calcFechamento(ab, vd, dc);
     const lf = lfVal !== '' && lfVal != null ? Number(lfVal) : null;
 
-    lancTanques[i] = { abertura: ab, vendas: vd, descarga: dc, fechamento: fech, leituraFisica: lf };
+    const placa = (document.getElementById(`lanc_pl_${i}`)?.value || '').trim().toUpperCase();
+    const motorista = (document.getElementById(`lanc_mt_${i}`)?.value || '').trim();
+    lancTanques[i] = { abertura: ab, vendas: vd, descarga: dc, fechamento: fech, leituraFisica: lf, placa, motorista };
   }
 
   if (!posto.lancamentos) posto.lancamentos = [];
@@ -803,6 +894,133 @@ function renderAnalise() {
   tableHtml += '</tbody></table></div>';
 
   document.getElementById('analiseContent').innerHTML = summaryHtml + tableHtml;
+}
+
+// ============================================================
+// ESTOQUE TOTAL (TODOS OS POSTOS)
+// ============================================================
+function renderEstoqueTotal() {
+  const data = getPostos();
+  const produtoEstoque = {};
+
+  // Agregar estoque de todos os postos por tipo de combustível
+  Object.keys(data.postos).forEach(nomePosto => {
+    const posto = data.postos[nomePosto];
+    const tanques = posto.tanques || [];
+    tanques.forEach((tq, i) => {
+      const comb = tq.combustivel;
+      if (!produtoEstoque[comb]) produtoEstoque[comb] = { totalEstoque: 0, totalCapacidade: 0, postos: [] };
+      const estoque = getEstoqueAtual(posto, i);
+      produtoEstoque[comb].totalEstoque += estoque;
+      produtoEstoque[comb].totalCapacidade += (tq.capacidade || 0);
+      if (estoque > 0) {
+        produtoEstoque[comb].postos.push({ nome: nomePosto, tanque: tq.nome, estoque });
+      }
+    });
+  });
+
+  const produtos = Object.keys(produtoEstoque).sort();
+  let grandeTotal = 0;
+  produtos.forEach(p => grandeTotal += produtoEstoque[p].totalEstoque);
+
+  // Recuperar preços salvos
+  let precosSalvos = {};
+  try { precosSalvos = JSON.parse(localStorage.getItem('ctrl_estoque_precos') || '{}'); } catch {}
+
+  let html = `
+  <div class="form-section" style="padding:20px;margin-bottom:20px;">
+    <div class="form-title" style="font-size:1.2rem;">📦 Estoque Total — Todos os Postos</div>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:4px;">Visão consolidada de todo o estoque separado por produto. Preencha o valor médio de venda para calcular o valor financeiro.</p>
+    <div class="cards" style="margin-top:16px;margin-bottom:0;">
+      <div class="card"><div class="card-label">Estoque Geral</div><div class="card-value" style="color:var(--accent)">${fmtL(grandeTotal)}</div><div class="card-sub">todos os produtos somados</div></div>
+      <div class="card"><div class="card-label">Produtos</div><div class="card-value" style="color:var(--accent2)">${produtos.length}</div><div class="card-sub">tipos de combustível</div></div>
+      <div class="card"><div class="card-label">Postos</div><div class="card-value" style="color:var(--cyan)">${Object.keys(data.postos).length}</div><div class="card-sub">cadastrados no sistema</div></div>
+      <div class="card"><div class="card-label">Valor Total Estimado</div><div class="card-value" style="color:var(--green)" id="etValorGrandTotal">R$ 0,00</div><div class="card-sub">baseado nos preços informados</div></div>
+    </div>
+  </div>`;
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;">';
+
+  produtos.forEach(comb => {
+    const info = produtoEstoque[comb];
+    const perc = pct(info.totalEstoque, info.totalCapacidade);
+    const p = parseFloat(perc);
+    const cor = barColor(p);
+    const precoAtual = precosSalvos[comb] || '';
+
+    html += `
+    <div class="tank-card">
+      <div class="tank-header">
+        <div>
+          <div class="tank-name">⛽ ${comb}</div>
+          <div style="color:var(--muted);font-size:.8rem;">Capacidade total: ${fmtL(info.totalCapacidade)}</div>
+        </div>
+        <span class="tank-badge badge-ok" style="font-size:.9rem;">${fmtL(info.totalEstoque)}</span>
+      </div>
+      <div class="tank-bar-wrap">
+        <div class="tank-bar" style="width:${perc}%;background:${cor};"></div>
+        <div class="tank-bar-label">${perc}%</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;">
+        <div class="form-group">
+          <label>💰 Valor Médio Venda (R$/L)</label>
+          <input type="number" id="et_preco_${comb.replace(/\s/g,'_')}" value="${precoAtual}" placeholder="0,00" step="0.01" min="0" oninput="calcEstoqueValor()">
+        </div>
+        <div style="text-align:right;align-self:end;padding-bottom:6px;">
+          <div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;">Valor Estimado</div>
+          <div style="font-size:1.3rem;font-weight:700;color:var(--green);" id="et_val_${comb.replace(/\s/g,'_')}">R$ 0,00</div>
+        </div>
+      </div>
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer;color:var(--muted);font-size:.8rem;">Ver detalhes por posto (${info.postos.length})</summary>
+        <div style="margin-top:8px;max-height:200px;overflow-y:auto;">
+          <table style="font-size:.8rem;"><thead><tr><th>Posto</th><th>Tanque</th><th class="text-right">Estoque</th></tr></thead><tbody>
+          ${info.postos.sort((a,b) => b.estoque - a.estoque).map(p => `<tr><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.nome}</td><td>${p.tanque}</td><td class="text-right">${fmtL(p.estoque)}</td></tr>`).join('')}
+          </tbody></table>
+        </div>
+      </details>
+    </div>`;
+  });
+
+  html += '</div>';
+
+  document.getElementById('estoqueTotalContent').innerHTML = html;
+
+  // Calcular valores iniciais se já houver preços
+  calcEstoqueValor();
+}
+
+function calcEstoqueValor() {
+  const data = getPostos();
+  const produtoEstoque = {};
+  Object.keys(data.postos).forEach(nomePosto => {
+    const posto = data.postos[nomePosto];
+    const tanques = posto.tanques || [];
+    tanques.forEach((tq, i) => {
+      const comb = tq.combustivel;
+      if (!produtoEstoque[comb]) produtoEstoque[comb] = 0;
+      produtoEstoque[comb] += getEstoqueAtual(posto, i);
+    });
+  });
+
+  let grandTotal = 0;
+  const precos = {};
+  Object.keys(produtoEstoque).forEach(comb => {
+    const inputId = `et_preco_${comb.replace(/\s/g,'_')}`;
+    const el = document.getElementById(inputId);
+    const preco = el ? Number(el.value) || 0 : 0;
+    precos[comb] = preco;
+    const valor = produtoEstoque[comb] * preco;
+    grandTotal += valor;
+    const valEl = document.getElementById(`et_val_${comb.replace(/\s/g,'_')}`);
+    if (valEl) valEl.textContent = 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  });
+
+  const gtEl = document.getElementById('etValorGrandTotal');
+  if (gtEl) gtEl.textContent = 'R$ ' + grandTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Salvar preços no localStorage
+  localStorage.setItem('ctrl_estoque_precos', JSON.stringify(precos));
 }
 
 // ============================================================
