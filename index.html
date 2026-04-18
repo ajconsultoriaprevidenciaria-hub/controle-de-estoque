@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Estoque - Postos de Combustível</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root {
   --bg: #0f172a; --surface: #1e293b; --card: #334155;
@@ -169,15 +170,136 @@ tr:hover td { background:rgba(59,130,246,.05); }
 .fuel-tag-sm { margin-right:5px; }
 .fuel-tag-sm .fuel-letter { width:22px; min-height:22px; font-size:.78rem; }
 .fuel-tag-sm .fuel-name { padding:2px 6px; font-size:.55rem; }
+
+/* LOGIN PORTAL */
+#loginPortal { position:fixed; inset:0; z-index:9999; background:linear-gradient(135deg,#0b1120 0%,#1a2744 40%,#0f172a 100%); display:flex; align-items:center; justify-content:center; }
+.login-container { width:100%; max-width:420px; padding:20px; }
+.login-box { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:40px 32px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+.login-logo { text-align:center; margin-bottom:28px; }
+.login-logo .icon { font-size:3.5rem; margin-bottom:8px; }
+.login-logo h2 { font-size:1.3rem; font-weight:700; color:var(--text); }
+.login-logo p { font-size:.8rem; color:var(--muted); margin-top:4px; }
+.login-box .form-group { margin-bottom:16px; }
+.login-box .form-group label { font-size:.75rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; margin-bottom:5px; display:block; }
+.login-box .form-group input { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); padding:12px 14px; border-radius:10px; font-size:.95rem; outline:none; transition:border-color .2s; }
+.login-box .form-group input:focus { border-color:var(--accent); }
+.login-btn { width:100%; padding:13px; border-radius:10px; border:none; font-weight:700; font-size:1rem; cursor:pointer; transition:all .15s; margin-top:8px; }
+.login-btn-primary { background:linear-gradient(135deg,var(--accent),#2563eb); color:#fff; }
+.login-btn-primary:hover { background:linear-gradient(135deg,#2563eb,#1d4ed8); transform:translateY(-1px); box-shadow:0 4px 16px rgba(59,130,246,.3); }
+.login-btn-success { background:linear-gradient(135deg,var(--green),#16a34a); color:#fff; }
+.login-btn-success:hover { background:linear-gradient(135deg,#16a34a,#15803d); transform:translateY(-1px); box-shadow:0 4px 16px rgba(34,197,94,.3); }
+.login-footer { text-align:center; margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+.login-footer a { color:var(--accent); font-size:.85rem; cursor:pointer; text-decoration:none; font-weight:600; transition:color .2s; }
+.login-footer a:hover { color:#60a5fa; text-decoration:underline; }
+.login-divider { display:flex; align-items:center; gap:12px; margin:20px 0; }
+.login-divider::before, .login-divider::after { content:''; flex:1; height:1px; background:var(--border); }
+.login-divider span { font-size:.75rem; color:var(--muted); text-transform:uppercase; }
+.login-msg { padding:10px 14px; border-radius:8px; font-size:.82rem; font-weight:600; margin-bottom:14px; display:none; }
+.login-msg-error { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); color:var(--red); }
+.login-msg-success { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:var(--green); }
+.login-user-bar { display:flex; align-items:center; gap:8px; font-size:.82rem; color:var(--muted); }
+.login-user-bar strong { color:var(--text); }
+.login-user-bar a { color:var(--red); cursor:pointer; font-weight:600; text-decoration:none; margin-left:8px; font-size:.78rem; }
+.login-user-bar a:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
+
+<!-- LOGIN PORTAL -->
+<div id="loginPortal">
+  <div class="login-container">
+    <!-- TELA LOGIN -->
+    <div id="loginScreen" class="login-box">
+      <div class="login-logo">
+        <div class="icon">⛽</div>
+        <h2>Controle de Estoque</h2>
+        <p>Postos de Combustível</p>
+      </div>
+      <div class="login-msg login-msg-error" id="loginError"></div>
+      <div class="form-group">
+        <label>CPF</label>
+        <input type="text" id="loginCPF" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="loginSenha" placeholder="Digite sua senha">
+      </div>
+      <button class="login-btn login-btn-primary" onclick="doLogin()">🔐 Entrar</button>
+      <div class="login-footer">
+        <a onclick="showScreen('register')">📋 Novo Cadastro</a>
+        <a onclick="showScreen('recover')">🔑 Recuperar Senha</a>
+      </div>
+    </div>
+    <!-- TELA CADASTRO -->
+    <div id="registerScreen" class="login-box" style="display:none;">
+      <div class="login-logo">
+        <div class="icon">📋</div>
+        <h2>Novo Cadastro</h2>
+        <p>Preencha os dados para criar sua conta</p>
+      </div>
+      <div class="login-msg login-msg-error" id="regError"></div>
+      <div class="login-msg login-msg-success" id="regSuccess"></div>
+      <div class="form-group">
+        <label>Nome Completo</label>
+        <input type="text" id="regNome" placeholder="Seu nome completo">
+      </div>
+      <div class="form-group">
+        <label>CPF</label>
+        <input type="text" id="regCPF" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="regSenha" placeholder="Crie uma senha">
+      </div>
+      <div class="form-group">
+        <label>Confirmar Senha</label>
+        <input type="password" id="regSenha2" placeholder="Repita a senha">
+      </div>
+      <button class="login-btn login-btn-success" onclick="doRegister()">✅ Cadastrar</button>
+      <div class="login-footer">
+        <a onclick="showScreen('login')">← Voltar ao Login</a>
+      </div>
+    </div>
+    <!-- TELA RECUPERAR SENHA -->
+    <div id="recoverScreen" class="login-box" style="display:none;">
+      <div class="login-logo">
+        <div class="icon">🔑</div>
+        <h2>Recuperar Senha</h2>
+        <p>Informe seu CPF para redefinir a senha</p>
+      </div>
+      <div class="login-msg login-msg-error" id="recError"></div>
+      <div class="login-msg login-msg-success" id="recSuccess"></div>
+      <div class="form-group">
+        <label>CPF</label>
+        <input type="text" id="recCPF" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)">
+      </div>
+      <div id="recNovaSenhaFields" style="display:none;">
+        <div class="form-group">
+          <label>Nova Senha</label>
+          <input type="password" id="recNovaSenha" placeholder="Digite a nova senha">
+        </div>
+        <div class="form-group">
+          <label>Confirmar Nova Senha</label>
+          <input type="password" id="recNovaSenha2" placeholder="Repita a nova senha">
+        </div>
+      </div>
+      <button class="login-btn login-btn-primary" id="recBtn" onclick="doRecover()">🔍 Buscar CPF</button>
+      <div class="login-footer">
+        <a onclick="showScreen('login')">← Voltar ao Login</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP WRAPPER -->
+<div id="appWrapper" style="display:none;">
 
 <!-- HEADER -->
 <div class="header">
   <h1>⛽ <span>Controle de Estoque</span> — Postos de Combustível</h1>
   <button id="btnEstoqueTotal" onclick="switchTab('estoquetotal')" style="margin-left:40px;background:var(--green);color:#fff;border:none;padding:8px 22px;border-radius:50px;font-weight:700;font-size:.85rem;cursor:pointer;transition:all .15s;white-space:nowrap;">📦 Estoque Total</button>
   <div class="header-right">
+    <div class="login-user-bar" id="userBar"></div>
     <select id="selPosto" onchange="onPostoChange()">
       <option value="">Selecione o Posto</option>
     </select>
@@ -188,9 +310,10 @@ tr:hover td { background:rgba(59,130,246,.05); }
 <div class="tabs" id="tabsBar">
   <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
   <button class="tab" data-tab="lancamento" onclick="switchTab('lancamento')">📝 Lançamento Diário</button>
-  <button class="tab" data-tab="historico" onclick="switchTab('historico')">📋 Histórico</button>
   <button class="tab" data-tab="analise" onclick="switchTab('analise')">🔍 Análise de Faltas</button>
+  <button class="tab" data-tab="fechamento" onclick="switchTab('fechamento')">📦 Fechamento de Carga</button>
   <button class="tab" data-tab="config" onclick="switchTab('config')">⚙️ Configurar Posto</button>
+  <button class="tab" data-tab="relatorio" onclick="switchTab('relatorio')">📧 Relatório E-mail</button>
 </div>
 
 <!-- MAIN CONTENT -->
@@ -233,28 +356,6 @@ tr:hover td { background:rgba(59,130,246,.05); }
     <div id="lancPreview"></div>
   </div>
 
-  <!-- HISTORICO -->
-  <div class="section" id="sec-historico">
-    <div class="form-section" style="padding:16px;">
-      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
-        <div class="form-group">
-          <label>De</label>
-          <input type="date" id="histDe">
-        </div>
-        <div class="form-group">
-          <label>Até</label>
-          <input type="date" id="histAte">
-        </div>
-        <div class="form-group">
-          <label>Tanque</label>
-          <select id="histTanque"><option value="all">Todos</option></select>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="renderHistorico()">Filtrar</button>
-      </div>
-    </div>
-    <div class="table-wrap" id="histTable"></div>
-  </div>
-
   <!-- ANALISE DE FALTAS -->
   <div class="section" id="sec-analise">
     <div id="analiseContent"></div>
@@ -264,9 +365,15 @@ tr:hover td { background:rgba(59,130,246,.05); }
   <div class="section" id="sec-config">
     <div class="form-section">
       <div class="form-title">⚙️ Configuração do Posto</div>
-      <div class="form-group" style="max-width:400px;margin-bottom:16px;">
-        <label>Nome do posto</label>
-        <input type="text" id="cfgNomePosto" placeholder="Ex: Mega Posto São Domingos">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;margin-bottom:16px;">
+        <div class="form-group">
+          <label>Nome do posto</label>
+          <input type="text" id="cfgNomePosto" placeholder="Ex: Mega Posto São Domingos">
+        </div>
+        <div class="form-group">
+          <label>CNPJ do posto</label>
+          <input type="text" id="cfgCNPJPosto" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)">
+        </div>
       </div>
       <div id="cfgTanks"></div>
       <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
@@ -290,12 +397,337 @@ tr:hover td { background:rgba(59,130,246,.05); }
       <button class="btn btn-danger" onclick="excluirPosto()">Excluir Posto Atual</button>
     </div>
   </div>
+
+  <!-- RELATORIO EMAIL -->
+  <div class="section" id="sec-relatorio">
+    <div class="form-section">
+      <div class="form-title">📧 Relatório por E-mail — Envio Automático às 10h via Gmail</div>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px;">Configure a integração com Gmail via <a href="https://www.emailjs.com/" target="_blank" style="color:var(--accent);">EmailJS</a> e gerencie os destinatários. O envio ocorre automaticamente às 10h.</p>
+
+      <div class="form-section" style="background:var(--bg);margin-bottom:16px;padding:16px;">
+        <div class="form-title" style="font-size:.95rem;">⚙️ Configuração EmailJS (Gmail)</div>
+        <p style="color:var(--muted);font-size:.78rem;margin-bottom:12px;">1) Crie conta grátis em <a href="https://www.emailjs.com/" target="_blank" style="color:var(--accent);">emailjs.com</a> → 2) Adicione serviço Gmail → 3) Crie um template com variáveis: <code style="color:var(--green);">{{to_email}}</code>, <code style="color:var(--green);">{{subject}}</code>, <code style="color:var(--green);">{{message}}</code> → 4) Copie os IDs abaixo.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+          <div class="form-group">
+            <label>Public Key</label>
+            <input type="text" id="ejs_publickey" placeholder="Ex: AbCdEfGhIjK" oninput="saveEmailJSConfig()">
+          </div>
+          <div class="form-group">
+            <label>Service ID</label>
+            <input type="text" id="ejs_serviceid" placeholder="Ex: service_gmail" oninput="saveEmailJSConfig()">
+          </div>
+          <div class="form-group">
+            <label>Template ID</label>
+            <input type="text" id="ejs_templateid" placeholder="Ex: template_relatorio" oninput="saveEmailJSConfig()">
+          </div>
+        </div>
+        <div id="ejsStatus" style="margin-top:10px;font-size:.8rem;"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">
+        <div class="form-group" style="flex:1;min-width:250px;">
+          <label>E-mail do Destinatário</label>
+          <input type="email" id="novoEmailDest" placeholder="email@exemplo.com">
+        </div>
+        <button class="btn btn-success btn-sm" onclick="addDestinatario()">+ Adicionar</button>
+      </div>
+      <div id="listaDestinatarios"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="enviarRelatorioAgora()">📤 Enviar Relatório Agora</button>
+        <button class="btn btn-secondary" onclick="previewRelatorio()">👁️ Pré-visualizar</button>
+      </div>
+      <div id="previewRelatorio" style="margin-top:16px;"></div>
+      <div id="logEnvios" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- FECHAMENTO DE CARGA -->
+  <div class="section" id="sec-fechamento">
+    <div class="form-section">
+      <div class="form-title">📦 Fechamento de Carga</div>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px;">Registre o lançamento de carga recebida. A descarga será lançada automaticamente no Lançamento Diário do posto.</p>
+      <div style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="abrirCadastroDistribuidora()">🏢 Cadastrar Distribuidora</button>
+        <button class="btn btn-success" onclick="abrirCadastroCaminhao()">🚛 Cadastrar Caminhão / Motorista</button>
+        <button class="btn btn-success" onclick="abrirCadastroPreco()">💰 Cadastrar Preço a Pagar por Litro</button>
+      </div>
+      <div class="form-section" style="background:var(--bg);padding:16px;margin-bottom:16px;display:none;" id="formDistribuidora">
+        <div class="form-title" style="font-size:.95rem;">🏢 Nova Distribuidora</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+          <div class="form-group">
+            <label>Razão Social</label>
+            <input type="text" id="distRazao" placeholder="Ex: Raizen Combustíveis">
+          </div>
+          <div class="form-group">
+            <label>CNPJ</label>
+            <input type="text" id="distCNPJ" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)">
+          </div>
+          <div class="form-group">
+            <label>Telefone</label>
+            <input type="text" id="distTelefone" placeholder="(00) 00000-0000" maxlength="15" oninput="maskTel(this)">
+          </div>
+          <div class="form-group">
+            <label>Contato</label>
+            <input type="text" id="distContato" placeholder="Nome do contato">
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px;">
+          <button class="btn btn-primary btn-sm" onclick="salvarDistribuidora()">💾 Salvar Distribuidora</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('formDistribuidora').style.display='none'">Cancelar</button>
+        </div>
+      </div>
+      <div class="form-section" style="background:var(--bg);padding:16px;margin-bottom:16px;display:none;" id="formCaminhao">
+        <div class="form-title" style="font-size:.95rem;">🚛 Novo Caminhão / Motorista</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+          <div class="form-group">
+            <label>Placa do Caminhão</label>
+            <input type="text" id="camPlaca" placeholder="ABC-1D23" maxlength="8" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="form-group">
+            <label>Nome do Motorista</label>
+            <input type="text" id="camMotorista" placeholder="EX: JOÃO SILVA" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="form-group">
+            <label>Telefone</label>
+            <input type="text" id="camTelefone" placeholder="(00) 00000-0000" maxlength="15" oninput="maskTel(this)">
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px;">
+          <button class="btn btn-primary btn-sm" onclick="salvarCaminhao()">💾 Salvar Caminhão</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('formCaminhao').style.display='none'">Cancelar</button>
+        </div>
+        <div id="listaCaminhoes" style="margin-top:16px;"></div>
+      </div>
+      <div id="listaDistribuidoras" style="margin-bottom:20px;"></div>
+
+      <div class="form-section" style="background:var(--bg);padding:16px;margin-bottom:16px;display:none;" id="formPreco">
+        <div class="form-title" style="font-size:.95rem;">💰 Preço a Pagar por Litro (R$/L)</div>
+        <div id="formPrecoConteudo"></div>
+        <div style="margin-top:12px;display:flex;gap:10px;">
+          <button class="btn btn-primary btn-sm" onclick="salvarPrecosPagar()">💾 Salvar Preços</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('formPreco').style.display='none'">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="form-section" style="background:var(--bg);padding:16px;">
+        <div class="form-title" style="font-size:.95rem;">🚚 Lançar Carga</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+          <div class="form-group">
+            <label>📅 Data da Carga</label>
+            <input type="date" id="fchData">
+          </div>
+          <div class="form-group">
+            <label>🏢 Distribuidora</label>
+            <select id="fchDistribuidora"><option value="">Selecione</option></select>
+          </div>
+          <div class="form-group">
+            <label>⛽ Posto que realizou a compra</label>
+            <select id="fchPosto" onchange="onFchPostoChange()"><option value="">Selecione</option></select>
+          </div>
+          <div class="form-group">
+            <label>CNPJ do Posto</label>
+            <input type="text" id="fchPostoCNPJ" readonly style="opacity:.7;background:var(--card);">
+          </div>
+          <div class="form-group">
+            <label> Placa do Caminhão</label>
+            <select id="fchPlaca"><option value="">SELECIONE</option></select>
+          </div>
+          <div class="form-group">
+            <label>👤 Motorista</label>
+            <select id="fchMotorista"><option value="">SELECIONE</option></select>
+          </div>
+        </div>
+
+        <div id="fchProdutosPrecos" style="margin-top:16px;"></div>
+        <div id="fchTanquesVolume" style="margin-top:16px;"></div>
+
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="salvarFechamentoCarga()">💾 Salvar Carga</button>
+        </div>
+      </div>
+      <div id="tabelaFechamentos" style="margin-top:20px;"></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+</div><!-- /appWrapper -->
+
 <script>
+// ============================================================
+// LOGIN SYSTEM
+// ============================================================
+const USERS_KEY = 'ctrl_estoque_users';
+const SESSION_KEY = 'ctrl_estoque_session';
+
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem(USERS_KEY) || '[]'); } catch { return []; }
+}
+function saveUsers(users) { localStorage.setItem(USERS_KEY, JSON.stringify(users)); }
+
+// Garantir admin padrão
+(function ensureAdmin() {
+  const users = getUsers();
+  if (!users.find(u => cleanCPF(u.cpf) === '03888170540')) {
+    users.push({ nome: 'Administrador', cpf: '03888170540', senha: '998426815', admin: true });
+    saveUsers(users);
+  }
+})();
+
+function maskCPF(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  el.value = v;
+}
+
+function cleanCPF(cpf) { return (cpf || '').replace(/\D/g, ''); }
+
+function validCPF(cpf) {
+  const c = cleanCPF(cpf);
+  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(c[i]) * (10 - i);
+  let d1 = 11 - (sum % 11); if (d1 >= 10) d1 = 0;
+  if (parseInt(c[9]) !== d1) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(c[i]) * (11 - i);
+  let d2 = 11 - (sum % 11); if (d2 >= 10) d2 = 0;
+  return parseInt(c[10]) === d2;
+}
+
+function showScreen(screen) {
+  document.getElementById('loginScreen').style.display = screen === 'login' ? '' : 'none';
+  document.getElementById('registerScreen').style.display = screen === 'register' ? '' : 'none';
+  document.getElementById('recoverScreen').style.display = screen === 'recover' ? '' : 'none';
+  // Reset messages
+  ['loginError','regError','regSuccess','recError','recSuccess'].forEach(id => {
+    const el = document.getElementById(id); el.style.display = 'none'; el.textContent = '';
+  });
+  document.getElementById('recNovaSenhaFields').style.display = 'none';
+  document.getElementById('recBtn').textContent = '🔍 Buscar CPF';
+  document.getElementById('recBtn').onclick = doRecover;
+}
+
+function showLoginMsg(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function doLogin() {
+  const cpf = cleanCPF(document.getElementById('loginCPF').value);
+  const senha = document.getElementById('loginSenha').value;
+  document.getElementById('loginError').style.display = 'none';
+  if (!cpf || !senha) { showLoginMsg('loginError', 'Preencha CPF e senha.'); return; }
+  const users = getUsers();
+  const user = users.find(u => cleanCPF(u.cpf) === cpf);
+  if (!user || user.senha !== senha) { showLoginMsg('loginError', 'CPF ou senha incorretos.'); return; }
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ nome: user.nome, cpf: user.cpf }));
+  enterApp(user);
+}
+
+function doRegister() {
+  const nome = document.getElementById('regNome').value.trim();
+  const cpf = document.getElementById('regCPF').value;
+  const senha = document.getElementById('regSenha').value;
+  const senha2 = document.getElementById('regSenha2').value;
+  document.getElementById('regError').style.display = 'none';
+  document.getElementById('regSuccess').style.display = 'none';
+  if (!nome || !cpf || !senha) { showLoginMsg('regError', 'Preencha todos os campos.'); return; }
+  if (!validCPF(cpf)) { showLoginMsg('regError', 'CPF inválido.'); return; }
+  if (senha.length < 4) { showLoginMsg('regError', 'A senha deve ter no mínimo 4 caracteres.'); return; }
+  if (senha !== senha2) { showLoginMsg('regError', 'As senhas não conferem.'); return; }
+  const users = getUsers();
+  if (users.find(u => cleanCPF(u.cpf) === cleanCPF(cpf))) { showLoginMsg('regError', 'CPF já cadastrado.'); return; }
+  users.push({ nome, cpf: cleanCPF(cpf), senha });
+  saveUsers(users);
+  showLoginMsg('regSuccess', 'Cadastro realizado com sucesso! Faça login.');
+  document.getElementById('regNome').value = '';
+  document.getElementById('regCPF').value = '';
+  document.getElementById('regSenha').value = '';
+  document.getElementById('regSenha2').value = '';
+  setTimeout(() => showScreen('login'), 1500);
+}
+
+let recoverCPFFound = '';
+function doRecover() {
+  const cpf = cleanCPF(document.getElementById('recCPF').value);
+  document.getElementById('recError').style.display = 'none';
+  document.getElementById('recSuccess').style.display = 'none';
+  if (!cpf) { showLoginMsg('recError', 'Informe o CPF.'); return; }
+  const users = getUsers();
+  const user = users.find(u => cleanCPF(u.cpf) === cpf);
+  if (!user) { showLoginMsg('recError', 'CPF não encontrado no sistema.'); return; }
+  recoverCPFFound = cpf;
+  document.getElementById('recNovaSenhaFields').style.display = '';
+  document.getElementById('recBtn').textContent = '💾 Redefinir Senha';
+  document.getElementById('recBtn').onclick = doResetPassword;
+  showLoginMsg('recSuccess', 'CPF encontrado: ' + user.nome + '. Defina a nova senha abaixo.');
+}
+
+function doResetPassword() {
+  const nova = document.getElementById('recNovaSenha').value;
+  const nova2 = document.getElementById('recNovaSenha2').value;
+  document.getElementById('recError').style.display = 'none';
+  document.getElementById('recSuccess').style.display = 'none';
+  if (!nova || nova.length < 4) { showLoginMsg('recError', 'A senha deve ter no mínimo 4 caracteres.'); return; }
+  if (nova !== nova2) { showLoginMsg('recError', 'As senhas não conferem.'); return; }
+  const users = getUsers();
+  const idx = users.findIndex(u => cleanCPF(u.cpf) === recoverCPFFound);
+  if (idx === -1) { showLoginMsg('recError', 'Erro: CPF não encontrado.'); return; }
+  users[idx].senha = nova;
+  saveUsers(users);
+  showLoginMsg('recSuccess', 'Senha redefinida com sucesso! Faça login.');
+  document.getElementById('recNovaSenha').value = '';
+  document.getElementById('recNovaSenha2').value = '';
+  setTimeout(() => showScreen('login'), 1500);
+}
+
+function enterApp(user) {
+  document.getElementById('loginPortal').style.display = 'none';
+  document.getElementById('appWrapper').style.display = '';
+  const adminLink = user.admin ? ' <a onclick="openCadastroColaborador()" style="color:var(--green);margin-left:8px;font-size:.78rem;cursor:pointer;font-weight:600;text-decoration:none;">Cadastrar Colaborador</a>' : '';
+  document.getElementById('userBar').innerHTML = `👤 <strong>${user.nome}</strong>${adminLink} <a onclick="doLogout()">Sair</a>`;
+  init();
+}
+
+function openCadastroColaborador() {
+  document.getElementById('loginPortal').style.display = 'flex';
+  showScreen('register');
+}
+
+function doLogout() {
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById('appWrapper').style.display = 'none';
+  document.getElementById('loginPortal').style.display = 'flex';
+  document.getElementById('loginCPF').value = '';
+  document.getElementById('loginSenha').value = '';
+  showScreen('login');
+}
+
+function checkSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if (session && session.cpf) {
+      const users = getUsers();
+      const user = users.find(u => cleanCPF(u.cpf) === cleanCPF(session.cpf));
+      if (user) { enterApp(user); return; }
+    }
+  } catch {}
+  document.getElementById('loginPortal').style.display = 'flex';
+}
+
+// Enter key support
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    if (document.getElementById('loginScreen').style.display !== 'none' && document.getElementById('loginPortal').style.display !== 'none') doLogin();
+  }
+});
+
 // ============================================================
 // DATA LAYER - localStorage
 // ============================================================
@@ -400,7 +832,7 @@ function onPostoChange() {
 }
 
 function switchTab(tab) {
-  if (!currentPosto && tab !== 'config' && tab !== 'estoquetotal') return;
+  if (!currentPosto && tab !== 'config' && tab !== 'estoquetotal' && tab !== 'relatorio' && tab !== 'fechamento') return;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-' + tab));
   // Destacar botão do cabeçalho
@@ -411,8 +843,10 @@ function switchTab(tab) {
     btnET.style.background = 'var(--green)'; btnET.style.boxShadow = 'none';
   }
   if (tab === 'estoquetotal') { renderEstoqueTotal(); return; }
+  if (tab === 'relatorio') { renderRelatorioEmail(); return; }
+  if (tab === 'fechamento') { renderFechamentoCarga(); return; }
   if (currentPosto || tab === 'config') {
-    const renders = { dashboard: renderDashboard, lancamento: renderLancForm, historico: renderHistorico, analise: renderAnalise, config: renderConfig };
+    const renders = { dashboard: renderDashboard, lancamento: renderLancForm, historico: renderHistorico, analise: renderAnalise, config: renderConfig, fechamento: renderFechamentoCarga };
     if (renders[tab]) renders[tab]();
   }
 }
@@ -1058,7 +1492,6 @@ function renderEstoqueTotal() {
       <div class="tank-header">
         <div>
           <div class="tank-name">${fuelTag(comb)} ${comb}</div>
-          <div style="color:var(--muted);font-size:.8rem;">Capacidade total: ${fmtL(info.totalCapacidade)}</div>
         </div>
         <span class="tank-badge badge-ok" style="font-size:.9rem;">${fmtL(info.totalEstoque)}</span>
       </div>
@@ -1145,6 +1578,7 @@ function renderConfig() {
   if (!posto) return;
   tempTanques = JSON.parse(JSON.stringify(posto.tanques || []));
   document.getElementById('cfgNomePosto').value = currentPosto;
+  document.getElementById('cfgCNPJPosto').value = posto.cnpj || '';
   renderConfigTanks();
 }
 
@@ -1241,6 +1675,7 @@ function salvarConfig() {
   }
 
   data.postos[currentPosto].tanques = JSON.parse(JSON.stringify(tempTanques));
+  data.postos[currentPosto].cnpj = (document.getElementById('cfgCNPJPosto')?.value || '').trim();
   console.log('Data depois de atualizar:', JSON.stringify(data.postos[currentPosto].tanques));
   
   saveData(data);
@@ -1283,9 +1718,662 @@ function excluirPosto() {
 }
 
 // ============================================================
+// RELATORIO EMAIL
+// ============================================================
+const DEST_KEY = 'ctrl_estoque_destinatarios';
+const REPORT_SENT_KEY = 'ctrl_estoque_report_sent';
+
+function getDestinatarios() {
+  try { return JSON.parse(localStorage.getItem(DEST_KEY) || '[]'); } catch { return []; }
+}
+function saveDestinatarios(list) { localStorage.setItem(DEST_KEY, JSON.stringify(list)); }
+
+// Garantir destinatário padrão
+(function ensureDefaultDest() {
+  const dests = getDestinatarios();
+  if (!dests.find(d => d.email === 'jonathan_fsa@hotmail.com')) {
+    dests.push({ email: 'jonathan_fsa@hotmail.com', ativo: true });
+    saveDestinatarios(dests);
+  }
+})();
+
+function renderRelatorioEmail() {
+  loadEmailJSConfig();
+  const dests = getDestinatarios();
+  let html = '<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>E-mail</th><th class="text-center">Ativo</th><th class="text-center">Ação</th></tr></thead><tbody>';
+  if (dests.length === 0) {
+    html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px;">Nenhum destinatário cadastrado</td></tr>';
+  } else {
+    dests.forEach((d, i) => {
+      html += `<tr>
+        <td>${d.email}</td>
+        <td class="text-center"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="toggleDestinatario(${i})"></td>
+        <td class="text-center"><button class="btn btn-danger btn-sm" onclick="removeDestinatario(${i})">Remover</button></td>
+      </tr>`;
+    });
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('listaDestinatarios').innerHTML = html;
+  document.getElementById('previewRelatorio').innerHTML = '';
+  renderLogEnvios();
+}
+
+function addDestinatario() {
+  const input = document.getElementById('novoEmailDest');
+  const email = input.value.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('E-mail inválido!', 'error'); return; }
+  const dests = getDestinatarios();
+  if (dests.find(d => d.email === email)) { showToast('E-mail já cadastrado!', 'error'); return; }
+  dests.push({ email, ativo: true });
+  saveDestinatarios(dests);
+  input.value = '';
+  renderRelatorioEmail();
+  showToast('Destinatário adicionado!');
+}
+
+function removeDestinatario(idx) {
+  const dests = getDestinatarios();
+  dests.splice(idx, 1);
+  saveDestinatarios(dests);
+  renderRelatorioEmail();
+  showToast('Destinatário removido!');
+}
+
+function toggleDestinatario(idx) {
+  const dests = getDestinatarios();
+  dests[idx].ativo = !dests[idx].ativo;
+  saveDestinatarios(dests);
+}
+
+function gerarRelatorioTexto() {
+  const data = getPostos();
+  const produtoEstoque = {};
+  Object.keys(data.postos).forEach(nomePosto => {
+    const posto = data.postos[nomePosto];
+    const tanques = posto.tanques || [];
+    tanques.forEach((tq, i) => {
+      const comb = tq.combustivel;
+      if (!produtoEstoque[comb]) produtoEstoque[comb] = { totalEstoque: 0, totalCapacidade: 0, postos: [] };
+      const estoque = getEstoqueAtual(posto, i);
+      produtoEstoque[comb].totalEstoque += estoque;
+      produtoEstoque[comb].totalCapacidade += (tq.capacidade || 0);
+      if (estoque > 0) {
+        produtoEstoque[comb].postos.push({ nome: nomePosto, tanque: tq.nome, estoque });
+      }
+    });
+  });
+  const produtos = Object.keys(produtoEstoque).sort();
+  let grandeTotal = 0;
+  produtos.forEach(p => grandeTotal += produtoEstoque[p].totalEstoque);
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  let texto = `RELATÓRIO DE ESTOQUE TOTAL - ${hoje} às ${hora}\n`;
+  texto += `${'='.repeat(50)}\n\n`;
+  texto += `ESTOQUE GERAL: ${Number(grandeTotal).toLocaleString('pt-BR')} L\n`;
+  texto += `TOTAL DE POSTOS: ${Object.keys(data.postos).length}\n`;
+  texto += `PRODUTOS: ${produtos.length} tipos\n\n`;
+  texto += `${'─'.repeat(50)}\n`;
+
+  produtos.forEach(comb => {
+    const info = produtoEstoque[comb];
+    const perc = info.totalCapacidade > 0 ? ((info.totalEstoque / info.totalCapacidade) * 100).toFixed(1) : '0.0';
+    texto += `\n📦 ${comb.toUpperCase()}\n`;
+    texto += `   Estoque: ${Number(info.totalEstoque).toLocaleString('pt-BR')} L\n`;
+    texto += `   Capacidade: ${Number(info.totalCapacidade).toLocaleString('pt-BR')} L\n`;
+    texto += `   Ocupação: ${perc}%\n`;
+    if (info.postos.length > 0) {
+      texto += `   Postos com estoque:\n`;
+      info.postos.sort((a, b) => b.estoque - a.estoque).forEach(p => {
+        texto += `     • ${p.nome} (${p.tanque}): ${Number(p.estoque).toLocaleString('pt-BR')} L\n`;
+      });
+    }
+  });
+
+  texto += `\n${'─'.repeat(50)}\n`;
+  texto += `Gerado automaticamente pelo Sistema de Controle de Estoque\n`;
+  return { assunto: `Relatório Estoque Total - ${hoje}`, corpo: texto };
+}
+
+function previewRelatorio() {
+  const rel = gerarRelatorioTexto();
+  document.getElementById('previewRelatorio').innerHTML = `
+    <div class="form-section" style="background:var(--bg);">
+      <div class="form-title">👁️ Pré-visualização</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:8px;">Assunto: <strong style="color:var(--text);">${rel.assunto}</strong></div>
+      <pre style="white-space:pre-wrap;font-size:.82rem;color:var(--text);line-height:1.5;max-height:400px;overflow-y:auto;padding:12px;background:var(--card);border-radius:8px;">${rel.corpo}</pre>
+    </div>`;
+}
+
+// EmailJS Config
+const EJS_CONFIG_KEY = 'ctrl_estoque_emailjs';
+const EJS_LOG_KEY = 'ctrl_estoque_email_log';
+
+function getEJSConfig() {
+  try { return JSON.parse(localStorage.getItem(EJS_CONFIG_KEY) || '{}'); } catch { return {}; }
+}
+function saveEmailJSConfig() {
+  const cfg = {
+    publicKey: document.getElementById('ejs_publickey').value.trim(),
+    serviceId: document.getElementById('ejs_serviceid').value.trim(),
+    templateId: document.getElementById('ejs_templateid').value.trim()
+  };
+  localStorage.setItem(EJS_CONFIG_KEY, JSON.stringify(cfg));
+  updateEJSStatus();
+}
+function loadEmailJSConfig() {
+  const cfg = getEJSConfig();
+  const pk = document.getElementById('ejs_publickey');
+  const si = document.getElementById('ejs_serviceid');
+  const ti = document.getElementById('ejs_templateid');
+  if (pk) pk.value = cfg.publicKey || '';
+  if (si) si.value = cfg.serviceId || '';
+  if (ti) ti.value = cfg.templateId || '';
+  updateEJSStatus();
+}
+function updateEJSStatus() {
+  const cfg = getEJSConfig();
+  const el = document.getElementById('ejsStatus');
+  if (!el) return;
+  if (cfg.publicKey && cfg.serviceId && cfg.templateId) {
+    el.innerHTML = '✅ <span style="color:var(--green);font-weight:600;">EmailJS configurado — envio automático via Gmail ativo</span>';
+  } else {
+    el.innerHTML = '⚠️ <span style="color:var(--yellow);font-weight:600;">Preencha os 3 campos para ativar o envio via Gmail</span>';
+  }
+}
+
+function getEmailLog() {
+  try { return JSON.parse(localStorage.getItem(EJS_LOG_KEY) || '[]'); } catch { return []; }
+}
+function addEmailLog(email, status, erro) {
+  const log = getEmailLog();
+  log.unshift({ data: new Date().toLocaleString('pt-BR'), email, status, erro: erro || '' });
+  if (log.length > 50) log.length = 50;
+  localStorage.setItem(EJS_LOG_KEY, JSON.stringify(log));
+}
+
+async function enviarParaDestinatario(cfg, rel, email) {
+  const params = {
+    to_email: email,
+    subject: rel.assunto,
+    message: rel.corpo
+  };
+  try {
+    await emailjs.send(cfg.serviceId, cfg.templateId, params, cfg.publicKey);
+    addEmailLog(email, 'OK', '');
+    return { ok: true };
+  } catch (err) {
+    const msg = err?.text || err?.message || String(err);
+    addEmailLog(email, 'ERRO', msg);
+    return { ok: false, erro: msg };
+  }
+}
+
+async function enviarRelatorioAgora() {
+  const cfg = getEJSConfig();
+  if (!cfg.publicKey || !cfg.serviceId || !cfg.templateId) {
+    showToast('Configure o EmailJS primeiro!', 'error');
+    return;
+  }
+  const dests = getDestinatarios().filter(d => d.ativo);
+  if (dests.length === 0) { showToast('Nenhum destinatário ativo!', 'error'); return; }
+  const rel = gerarRelatorioTexto();
+  showToast('Enviando relatório...');
+  let ok = 0, falha = 0;
+  for (const d of dests) {
+    const res = await enviarParaDestinatario(cfg, rel, d.email);
+    if (res.ok) ok++; else falha++;
+  }
+  localStorage.setItem(REPORT_SENT_KEY, new Date().toISOString().slice(0, 10));
+  if (falha === 0) {
+    showToast(`Relatório enviado para ${ok} destinatário(s)!`);
+  } else {
+    showToast(`Enviado: ${ok} | Falha: ${falha}. Verifique o log.`, 'error');
+  }
+  renderLogEnvios();
+}
+
+function renderLogEnvios() {
+  const log = getEmailLog();
+  const el = document.getElementById('logEnvios');
+  if (!el || log.length === 0) { if (el) el.innerHTML = ''; return; }
+  let html = '<div class="form-section" style="background:var(--bg);padding:14px;"><div class="form-title" style="font-size:.9rem;">📋 Log de Envios</div>';
+  html += '<div style="max-height:200px;overflow-y:auto;"><table style="font-size:.78rem;"><thead><tr><th>Data/Hora</th><th>E-mail</th><th>Status</th><th>Detalhe</th></tr></thead><tbody>';
+  log.forEach(l => {
+    const cor = l.status === 'OK' ? 'var(--green)' : 'var(--red)';
+    html += `<tr><td>${l.data}</td><td>${l.email}</td><td style="color:${cor};font-weight:700;">${l.status}</td><td style="color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.erro}</td></tr>`;
+  });
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+}
+
+// Timer: verificar a cada minuto se são 10h e enviar automaticamente via Gmail
+function checkAutoEnvio() {
+  const agora = new Date();
+  if (agora.getHours() === 10 && agora.getMinutes() === 0) {
+    const hoje = agora.toISOString().slice(0, 10);
+    const jaEnviou = localStorage.getItem(REPORT_SENT_KEY);
+    if (jaEnviou !== hoje) {
+      enviarRelatorioAgora();
+    }
+  }
+}
+setInterval(checkAutoEnvio, 60000);
+
+// ============================================================
+// FECHAMENTO DE CARGA
+// ============================================================
+const DISTRIB_KEY = 'ctrl_estoque_distribuidoras';
+const FECH_KEY = 'ctrl_estoque_fechamentos';
+const CAMINHAO_KEY = 'ctrl_estoque_caminhoes';
+const PRECOS_PAGAR_KEY = 'ctrl_estoque_precos_pagar';
+
+function getDistribuidoras() {
+  try { return JSON.parse(localStorage.getItem(DISTRIB_KEY) || '[]'); } catch { return []; }
+}
+function saveDistribuidoras(list) { localStorage.setItem(DISTRIB_KEY, JSON.stringify(list)); }
+
+function getFechamentos() {
+  try { return JSON.parse(localStorage.getItem(FECH_KEY) || '[]'); } catch { return []; }
+}
+function saveFechamentos(list) { localStorage.setItem(FECH_KEY, JSON.stringify(list)); }
+
+function maskCNPJ(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 14);
+  if (v.length > 12) v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2})/, '$1.$2.$3/$4-$5');
+  else if (v.length > 8) v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{1,4})/, '$1.$2.$3/$4');
+  else if (v.length > 5) v = v.replace(/(\d{2})(\d{3})(\d{1,3})/, '$1.$2.$3');
+  else if (v.length > 2) v = v.replace(/(\d{2})(\d{1,3})/, '$1.$2');
+  el.value = v;
+}
+
+function maskTel(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 6) v = v.replace(/(\d{2})(\d{4,5})(\d{1,4})/, '($1) $2-$3');
+  else if (v.length > 2) v = v.replace(/(\d{2})(\d{1,5})/, '($1) $2');
+  el.value = v;
+}
+
+function getCaminhoes() {
+  try { return JSON.parse(localStorage.getItem(CAMINHAO_KEY) || '[]'); } catch { return []; }
+}
+function saveCaminhoes(list) { localStorage.setItem(CAMINHAO_KEY, JSON.stringify(list)); }
+
+function abrirCadastroDistribuidora() {
+  const form = document.getElementById('formDistribuidora');
+  form.style.display = form.style.display === 'none' ? '' : 'none';
+  document.getElementById('formCaminhao').style.display = 'none';
+  document.getElementById('formPreco').style.display = 'none';
+}
+
+function abrirCadastroCaminhao() {
+  const form = document.getElementById('formCaminhao');
+  form.style.display = form.style.display === 'none' ? '' : 'none';
+  document.getElementById('formDistribuidora').style.display = 'none';
+  document.getElementById('formPreco').style.display = 'none';
+}
+
+function abrirCadastroPreco() {
+  const form = document.getElementById('formPreco');
+  const isHidden = form.style.display === 'none';
+  document.getElementById('formDistribuidora').style.display = 'none';
+  document.getElementById('formCaminhao').style.display = 'none';
+  form.style.display = isHidden ? '' : 'none';
+  if (isHidden) renderFormPreco();
+}
+
+function getPrecosPagar() {
+  try { return JSON.parse(localStorage.getItem(PRECOS_PAGAR_KEY) || '{}'); } catch { return {}; }
+}
+function savePrecosPagar(obj) { localStorage.setItem(PRECOS_PAGAR_KEY, JSON.stringify(obj)); }
+
+function renderFormPreco() {
+  const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Diesel S500','Diesel S10','Etanol Hidratado'];
+  const precos = getPrecosPagar();
+  const distribs = getDistribuidoras();
+  let html = '<div class="form-group" style="max-width:320px;margin-bottom:14px;"><label>🏢 Distribuidora</label><select id="precoDistribuidora"><option value="">SELECIONE</option>';
+  distribs.forEach(d => { html += `<option value="${d.razao}">${d.razao}</option>`; });
+  html += '</select></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;max-width:600px;">';
+  COMBUSTIVEIS.forEach(c => {
+    const id = 'precoPagar_' + c.replace(/\s/g, '_');
+    const val = precos[c]?.valor || precos[c] || '';
+    html += `<div style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+      <div style="flex:1;white-space:nowrap;font-size:.82rem;font-weight:600;">${fuelTag(c, true)}</div>
+      <input type="number" id="${id}" value="${val}" placeholder="0,00" min="0" step="0.01" style="width:75px;text-align:center;padding:5px 4px;font-size:.85rem;font-weight:700;color:#fff;">
+    </div>`;
+  });
+  html += '</div>';
+  if (precos._distribuidora) {
+    setTimeout(() => { const el = document.getElementById('precoDistribuidora'); if (el) el.value = precos._distribuidora; }, 0);
+  }
+  document.getElementById('formPrecoConteudo').innerHTML = html;
+}
+
+function salvarPrecosPagar() {
+  const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Diesel S500','Diesel S10','Etanol Hidratado'];
+  const distrib = document.getElementById('precoDistribuidora')?.value || '';
+  if (!distrib) { showToast('Selecione a distribuidora!', 'error'); return; }
+  const precos = { _distribuidora: distrib };
+  COMBUSTIVEIS.forEach(c => {
+    const id = 'precoPagar_' + c.replace(/\s/g, '_');
+    const el = document.getElementById(id);
+    precos[c] = el ? Number(el.value) || 0 : 0;
+  });
+  savePrecosPagar(precos);
+  showToast('Preços salvos com sucesso!');
+  document.getElementById('formPreco').style.display = 'none';
+}
+
+function salvarCaminhao() {
+  const placa = document.getElementById('camPlaca').value.trim().toUpperCase();
+  const motorista = document.getElementById('camMotorista').value.trim().toUpperCase();
+  const telefone = document.getElementById('camTelefone').value.trim();
+  if (!placa || !motorista) { showToast('Informe placa e motorista!', 'error'); return; }
+  const lista = getCaminhoes();
+  if (lista.find(c => c.placa === placa && c.motorista === motorista)) { showToast('Caminhão/Motorista já cadastrado!', 'error'); return; }
+  lista.push({ placa, motorista, telefone });
+  saveCaminhoes(lista);
+  document.getElementById('camPlaca').value = '';
+  document.getElementById('camMotorista').value = '';
+  document.getElementById('camTelefone').value = '';
+  document.getElementById('formCaminhao').style.display = 'none';
+  showToast('Caminhão/Motorista cadastrado!');
+  renderFechamentoCarga();
+}
+
+function removerCaminhao(idx) {
+  if (!confirm('Remover este caminhão/motorista?')) return;
+  const lista = getCaminhoes();
+  lista.splice(idx, 1);
+  saveCaminhoes(lista);
+  renderFechamentoCarga();
+  showToast('Caminhão removido!');
+}
+
+
+
+function salvarDistribuidora() {
+  const razao = document.getElementById('distRazao').value.trim();
+  const cnpj = document.getElementById('distCNPJ').value.trim();
+  const telefone = document.getElementById('distTelefone').value.trim();
+  const contato = document.getElementById('distContato').value.trim();
+  if (!razao) { showToast('Informe a razão social!', 'error'); return; }
+  const distribs = getDistribuidoras();
+  if (distribs.find(d => d.razao.toLowerCase() === razao.toLowerCase())) { showToast('Distribuidora já cadastrada!', 'error'); return; }
+  distribs.push({ razao, cnpj, telefone, contato });
+  saveDistribuidoras(distribs);
+  document.getElementById('distRazao').value = '';
+  document.getElementById('distCNPJ').value = '';
+  document.getElementById('distTelefone').value = '';
+  document.getElementById('distContato').value = '';
+  document.getElementById('formDistribuidora').style.display = 'none';
+  showToast('Distribuidora cadastrada!');
+  renderFechamentoCarga();
+}
+
+function removerDistribuidora(idx) {
+  if (!confirm('Remover esta distribuidora?')) return;
+  const distribs = getDistribuidoras();
+  distribs.splice(idx, 1);
+  saveDistribuidoras(distribs);
+  renderFechamentoCarga();
+  showToast('Distribuidora removida!');
+}
+
+function salvarFechamentoCarga() {
+  const dataCarga = document.getElementById('fchData').value;
+  const distrib = document.getElementById('fchDistribuidora').value;
+  const postoNome = document.getElementById('fchPosto').value;
+  const nf = document.getElementById('fchNF').value.trim();
+  const placa = document.getElementById('fchPlaca').value.trim();
+  const motorista = document.getElementById('fchMotorista').value.trim();
+
+  if (!dataCarga || !distrib || !postoNome) {
+    showToast('Preencha data, distribuidora e posto!', 'error'); return;
+  }
+
+  // Capturar preços por produto
+  const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Diesel S500','Diesel S10','Etanol Hidratado'];
+  const precosProduto = {};
+  COMBUSTIVEIS.forEach(c => {
+    const el = document.getElementById('fchPreco_' + c.replace(/\s/g, '_'));
+    precosProduto[c] = el ? Number(el.value) || 0 : 0;
+  });
+
+  // Capturar volumes por tanque
+  const allData = getPostos();
+  const posto = allData.postos[postoNome];
+  if (!posto) { showToast('Posto não encontrado!', 'error'); return; }
+  const tanques = posto.tanques || [];
+  const tanquesCarregados = [];
+  let totalVolume = 0;
+
+  tanques.forEach((tq, i) => {
+    const el = document.getElementById('fchVol_' + i);
+    const vol = el ? Number(el.value) || 0 : 0;
+    if (vol > 0) {
+      tanquesCarregados.push({ idx: i, nome: tq.nome, combustivel: tq.combustivel, volume: vol });
+      totalVolume += vol;
+    }
+  });
+
+  if (totalVolume === 0) {
+    showToast('Informe o volume em pelo menos um tanque!', 'error'); return;
+  }
+
+  // Salvar fechamento
+  const fechamentos = getFechamentos();
+  fechamentos.push({
+    data: dataCarga, posto: postoNome, distribuidora: distrib,
+    precosProduto, tanques: tanquesCarregados, totalVolume,
+    nf, placa, motorista, criadoEm: new Date().toISOString()
+  });
+  saveFechamentos(fechamentos);
+
+  // Lançar descarga automaticamente no Lançamento Diário
+  if (!posto.lancamentos) posto.lancamentos = [];
+  let lanc = posto.lancamentos.find(l => l.data === dataCarga);
+  if (!lanc) {
+    lanc = { data: dataCarga, tanques: {} };
+    posto.lancamentos.push(lanc);
+  }
+  tanquesCarregados.forEach(tc => {
+    if (!lanc.tanques[tc.idx]) {
+      const abCalc = getAberturaParaData(posto, tc.idx, dataCarga);
+      lanc.tanques[tc.idx] = { abertura: abCalc, vendas: 0, descarga: tc.volume, fechamento: calcFechamento(abCalc, 0, tc.volume), leituraFisica: null, placa: placa, motorista: motorista };
+    } else {
+      lanc.tanques[tc.idx].descarga = (Number(lanc.tanques[tc.idx].descarga) || 0) + tc.volume;
+      const ab = Number(lanc.tanques[tc.idx].abertura) || 0;
+      const vd = Number(lanc.tanques[tc.idx].vendas) || 0;
+      lanc.tanques[tc.idx].fechamento = calcFechamento(ab, vd, lanc.tanques[tc.idx].descarga);
+      if (placa) lanc.tanques[tc.idx].placa = placa;
+      if (motorista) lanc.tanques[tc.idx].motorista = motorista;
+    }
+  });
+  posto.lancamentos.sort((a, b) => a.data.localeCompare(b.data));
+  savePosto(postoNome, posto);
+
+  // Limpar campos de volume
+  tanques.forEach((_, i) => {
+    const el = document.getElementById('fchVol_' + i);
+    if (el) el.value = '';
+  });
+  document.getElementById('fchNF').value = '';
+  document.getElementById('fchPlaca').value = '';
+  document.getElementById('fchMotorista').value = '';
+
+  showToast(`Carga salva! ${totalVolume.toLocaleString('pt-BR')} L lançados automaticamente como descarga.`);
+  renderFechamentoCarga();
+}
+
+function removerFechamento(idx) {
+  if (!confirm('Remover este fechamento?')) return;
+  const fechamentos = getFechamentos();
+  fechamentos.splice(idx, 1);
+  saveFechamentos(fechamentos);
+  renderFechamentoCarga();
+  showToast('Fechamento removido!');
+}
+
+function renderFechamentoCarga() {
+  // Popula select de distribuidoras
+  const distribs = getDistribuidoras();
+  const selDist = document.getElementById('fchDistribuidora');
+  if (selDist) {
+    const valAtual = selDist.value;
+    selDist.innerHTML = '<option value="">Selecione</option>';
+    distribs.forEach(d => {
+      selDist.innerHTML += `<option value="${d.razao}">${d.razao}</option>`;
+    });
+    if (valAtual) selDist.value = valAtual;
+  }
+
+  // Popula select de postos
+  const allData = getPostos();
+  const selPosto = document.getElementById('fchPosto');
+  if (selPosto) {
+    const valAtual = selPosto.value;
+    selPosto.innerHTML = '<option value="">Selecione</option>';
+    Object.keys(allData.postos).sort().forEach(nome => {
+      selPosto.innerHTML += `<option value="${nome}">${nome}</option>`;
+    });
+    if (valAtual) selPosto.value = valAtual;
+  }
+
+  // Data padrão
+  const fchData = document.getElementById('fchData');
+  if (fchData && !fchData.value) fchData.value = new Date().toISOString().slice(0, 10);
+
+  // Renderizar preços e tanques se posto já selecionado
+  onFchPostoChange();
+
+  // Popula selects individuais de placa e motorista
+  const caminhoes = getCaminhoes();
+  const selPlaca = document.getElementById('fchPlaca');
+  const selMotorista = document.getElementById('fchMotorista');
+  if (selPlaca) {
+    const valAtual = selPlaca.value;
+    const placasUnicas = [...new Set(caminhoes.map(c => c.placa))];
+    selPlaca.innerHTML = '<option value="">SELECIONE</option>';
+    placasUnicas.forEach(p => {
+      selPlaca.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+    if (valAtual) selPlaca.value = valAtual;
+  }
+  if (selMotorista) {
+    const valAtual = selMotorista.value;
+    const motoristasUnicos = [...new Set(caminhoes.map(c => c.motorista))];
+    selMotorista.innerHTML = '<option value="">SELECIONE</option>';
+    motoristasUnicos.forEach(m => {
+      selMotorista.innerHTML += `<option value="${m}">${m}</option>`;
+    });
+    if (valAtual) selMotorista.value = valAtual;
+  }
+
+  // Lista de distribuidoras
+  let htmlDist = '';
+  if (distribs.length > 0) {
+    htmlDist = '<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>Razão Social</th><th>CNPJ</th><th>Telefone</th><th>Contato</th><th class="text-center">Ação</th></tr></thead><tbody>';
+    distribs.forEach((d, i) => {
+      htmlDist += `<tr><td>${d.razao}</td><td>${d.cnpj || '—'}</td><td>${d.telefone || '—'}</td><td>${d.contato || '—'}</td><td class="text-center"><button class="btn btn-danger btn-sm" onclick="removerDistribuidora(${i})">Remover</button></td></tr>`;
+    });
+    htmlDist += '</tbody></table></div>';
+  }
+  document.getElementById('listaDistribuidoras').innerHTML = htmlDist;
+
+  // Lista de caminhões
+  let htmlCam = '';
+  if (caminhoes.length > 0) {
+    htmlCam = '<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>PLACA</th><th>MOTORISTA</th><th>TELEFONE</th><th class="text-center">AÇÃO</th></tr></thead><tbody>';
+    caminhoes.forEach((c, i) => {
+      htmlCam += `<tr><td style="font-weight:700;">${c.placa}</td><td>${c.motorista}</td><td>${c.telefone || '—'}</td><td class="text-center"><button class="btn btn-danger btn-sm" onclick="removerCaminhao(${i})">Remover</button></td></tr>`;
+    });
+    htmlCam += '</tbody></table></div>';
+  }
+  document.getElementById('listaCaminhoes').innerHTML = htmlCam;
+
+  // Tabela de fechamentos
+  const fechamentos = getFechamentos().sort((a, b) => b.data.localeCompare(a.data));
+  let htmlFech = '';
+  if (fechamentos.length > 0) {
+    htmlFech = '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Posto</th><th>Distribuidora</th><th class="text-right">Volume Total</th><th>Tanques</th><th>NF</th><th>Placa</th><th>Motorista</th><th class="text-center">Ação</th></tr></thead><tbody>';
+    fechamentos.forEach((f) => {
+      const idxReal = getFechamentos().indexOf(f);
+      const tanquesStr = (f.tanques || []).map(t => `${fuelTag(t.combustivel, true)} ${t.nome}: ${Number(t.volume).toLocaleString('pt-BR')} L`).join('<br>');
+      htmlFech += `<tr>
+        <td>${f.data.split('-').reverse().join('/')}</td>
+        <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.posto || '—'}</td>
+        <td>${f.distribuidora}</td>
+        <td class="text-right" style="font-weight:700;color:var(--green);">${Number(f.totalVolume || 0).toLocaleString('pt-BR')} L</td>
+        <td style="font-size:.78rem;line-height:1.6;">${tanquesStr || '—'}</td>
+        <td>${f.nf || '—'}</td>
+        <td>${f.placa || '—'}</td>
+        <td>${f.motorista || '—'}</td>
+        <td class="text-center"><button class="btn btn-danger btn-sm" onclick="removerFechamento(${idxReal})">X</button></td>
+      </tr>`;
+    });
+    htmlFech += '</tbody></table></div>';
+  } else {
+    htmlFech = '<div class="empty-state" style="padding:30px;"><div class="icon">📦</div><p>Nenhum fechamento de carga registrado</p></div>';
+  }
+  document.getElementById('tabelaFechamentos').innerHTML = htmlFech;
+}
+
+function onFchPostoChange() {
+  const postoNome = document.getElementById('fchPosto')?.value;
+  const cnpjEl = document.getElementById('fchPostoCNPJ');
+  const precosDiv = document.getElementById('fchProdutosPrecos');
+  const tanquesDiv = document.getElementById('fchTanquesVolume');
+
+  if (!postoNome) {
+    if (cnpjEl) cnpjEl.value = '';
+    if (precosDiv) precosDiv.innerHTML = '';
+    if (tanquesDiv) tanquesDiv.innerHTML = '';
+    return;
+  }
+
+  const allData = getPostos();
+  const posto = allData.postos[postoNome];
+  if (!posto) return;
+
+  // CNPJ
+  if (cnpjEl) cnpjEl.value = posto.cnpj || 'Não cadastrado';
+
+  // Produtos únicos do posto
+  const tanques = posto.tanques || [];
+  const combustiveisUnicos = [...new Set(tanques.map(t => t.combustivel))];
+
+  // Preços por produto
+  let htmlPrecos = '<div class="form-title" style="font-size:.9rem;margin-bottom:10px;">💰 Valor por Produto (R$/L)</div>';
+  htmlPrecos += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">';
+  combustiveisUnicos.forEach(c => {
+    const id = 'fchPreco_' + c.replace(/\s/g, '_');
+    htmlPrecos += `<div class="form-group">
+      <label>${fuelTag(c, true)} ${c}</label>
+      <input type="number" id="${id}" placeholder="0,00" min="0" step="0.01">
+    </div>`;
+  });
+  htmlPrecos += '</div>';
+  if (precosDiv) precosDiv.innerHTML = htmlPrecos;
+
+  // Tanques para volume
+  let htmlTanques = '<div class="form-title" style="font-size:.9rem;margin-bottom:10px;">🚢 Volume Carregado por Tanque (L)</div>';
+  htmlTanques += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
+  tanques.forEach((tq, i) => {
+    htmlTanques += `<div class="form-group">
+      <label>${fuelTag(tq.combustivel, true)} ${tq.nome} <span style="color:var(--muted);font-size:.65rem;">(Cap: ${Number(tq.capacidade).toLocaleString('pt-BR')} L)</span></label>
+      <input type="number" id="fchVol_${i}" placeholder="0" min="0" step="1">
+    </div>`;
+  });
+  htmlTanques += '</div>';
+  if (tanquesDiv) tanquesDiv.innerHTML = htmlTanques;
+}
+
+// ============================================================
 // INIT
 // ============================================================
-init();
+checkSession();
 </script>
 </body>
 </html>
