@@ -463,18 +463,18 @@ tr:hover td { background:rgba(59,130,246,.05); }
             <input type="text" id="distCNPJ" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)">
           </div>
           <div class="form-group">
-            <label>Telefone</label>
-            <input type="text" id="distTelefone" placeholder="(00) 00000-0000" maxlength="15" oninput="maskTel(this)">
-          </div>
-          <div class="form-group">
-            <label>Contato</label>
-            <input type="text" id="distContato" placeholder="Nome do contato">
+            <label>Base de Carregamento</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="distBase" style="flex:1;"><option value="">Selecione</option></select>
+              <button class="btn btn-success" style="padding:4px 8px;font-size:.75rem;white-space:nowrap;" onclick="cadastrarBaseCarregamento()">+ Base</button>
+            </div>
           </div>
         </div>
         <div style="margin-top:12px;display:flex;gap:10px;">
           <button class="btn btn-primary btn-sm" onclick="salvarDistribuidora()">💾 Salvar Distribuidora</button>
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('formDistribuidora').style.display='none'">Cancelar</button>
         </div>
+        <div id="listaDistribuidoras" style="margin-top:16px;"></div>
       </div>
       <div class="form-section" style="background:var(--bg);padding:16px;margin-bottom:16px;display:none;" id="formCaminhao">
         <div class="form-title" style="font-size:.95rem;">🚛 Novo Caminhão / Motorista</div>
@@ -498,7 +498,6 @@ tr:hover td { background:rgba(59,130,246,.05); }
         </div>
         <div id="listaCaminhoes" style="margin-top:16px;"></div>
       </div>
-      <div id="listaDistribuidoras" style="margin-bottom:20px;"></div>
 
       <div class="form-section" style="background:var(--bg);padding:16px;margin-bottom:16px;display:none;" id="formPreco">
         <div class="form-title" style="font-size:.95rem;">💰 Preço a Pagar por Litro (R$/L)</div>
@@ -2004,6 +2003,7 @@ function abrirCadastroDistribuidora() {
   form.style.display = form.style.display === 'none' ? '' : 'none';
   document.getElementById('formCaminhao').style.display = 'none';
   document.getElementById('formPreco').style.display = 'none';
+  populateSelectBases();
 }
 
 function abrirCadastroCaminhao() {
@@ -2023,46 +2023,74 @@ function abrirCadastroPreco() {
 }
 
 function getPrecosPagar() {
-  try { return JSON.parse(localStorage.getItem(PRECOS_PAGAR_KEY) || '{}'); } catch { return {}; }
+  try { const d = JSON.parse(localStorage.getItem(PRECOS_PAGAR_KEY) || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
-function savePrecosPagar(obj) { localStorage.setItem(PRECOS_PAGAR_KEY, JSON.stringify(obj)); }
+function savePrecosPagar(arr) { localStorage.setItem(PRECOS_PAGAR_KEY, JSON.stringify(arr)); }
 
 function renderFormPreco() {
   const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Diesel S500','Diesel S10','Etanol Hidratado'];
-  const precos = getPrecosPagar();
   const distribs = getDistribuidoras();
-  let html = '<div class="form-group" style="max-width:320px;margin-bottom:14px;"><label>🏢 Distribuidora</label><select id="precoDistribuidora"><option value="">SELECIONE</option>';
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:600px;margin-bottom:14px;">';
+  html += '<div class="form-group"><label>\ud83d\udcc5 Data</label><input type="date" id="precoData" value="' + new Date().toISOString().slice(0,10) + '"></div>';
+  html += '<div class="form-group"><label>\ud83c\udfe2 Distribuidora</label><select id="precoDistribuidora"><option value="">SELECIONE</option>';
   distribs.forEach(d => { html += `<option value="${d.razao}">${d.razao}</option>`; });
-  html += '</select></div>';
+  html += '</select></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;max-width:600px;">';
   COMBUSTIVEIS.forEach(c => {
     const id = 'precoPagar_' + c.replace(/\s/g, '_');
-    const val = precos[c]?.valor || precos[c] || '';
     html += `<div style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
       <div style="flex:1;white-space:nowrap;font-size:.82rem;font-weight:600;">${fuelTag(c, true)}</div>
-      <input type="number" id="${id}" value="${val}" placeholder="0,00" min="0" step="0.01" style="width:75px;text-align:center;padding:5px 4px;font-size:.85rem;font-weight:700;color:#fff;">
+      <input type="number" id="${id}" value="" placeholder="0,00" min="0" step="0.01" style="width:75px;text-align:center;padding:5px 4px;font-size:.85rem;font-weight:700;color:#fff;">
     </div>`;
   });
   html += '</div>';
-  if (precos._distribuidora) {
-    setTimeout(() => { const el = document.getElementById('precoDistribuidora'); if (el) el.value = precos._distribuidora; }, 0);
+  // Hist\u00f3rico
+  const historico = getPrecosPagar().sort((a,b) => b.data.localeCompare(a.data));
+  if (historico.length > 0) {
+    html += '<div style="margin-top:16px;"><div style="font-weight:700;font-size:.85rem;margin-bottom:8px;">\ud83d\udcca Hist\u00f3rico de Pre\u00e7os</div>';
+    html += '<div class="table-wrap"><table><thead><tr><th>DATA</th><th>DISTRIBUIDORA</th>';
+    COMBUSTIVEIS.forEach(c => { html += `<th class="text-center">${fuelTag(c, true)}</th>`; });
+    html += '<th class="text-center">A\u00c7\u00c3O</th></tr></thead><tbody>';
+    historico.forEach((reg) => {
+      const idxReal = getPrecosPagar().indexOf(reg);
+      html += `<tr><td style="font-weight:700;">${reg.data.split('-').reverse().join('/')}</td><td>${reg.distribuidora || '\u2014'}</td>`;
+      COMBUSTIVEIS.forEach(c => {
+        const v = reg.precos?.[c] || 0;
+        html += `<td class="text-center" style="font-weight:700;color:#fff;">${v ? 'R$ ' + Number(v).toFixed(2) : '\u2014'}</td>`;
+      });
+      html += `<td class="text-center"><button class="btn btn-danger btn-sm" onclick="removerPrecoPagar(${idxReal})">X</button></td></tr>`;
+    });
+    html += '</tbody></table></div></div>';
   }
   document.getElementById('formPrecoConteudo').innerHTML = html;
 }
 
 function salvarPrecosPagar() {
   const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Diesel S500','Diesel S10','Etanol Hidratado'];
+  const dataPreco = document.getElementById('precoData')?.value || '';
   const distrib = document.getElementById('precoDistribuidora')?.value || '';
+  if (!dataPreco) { showToast('Informe a data!', 'error'); return; }
   if (!distrib) { showToast('Selecione a distribuidora!', 'error'); return; }
-  const precos = { _distribuidora: distrib };
+  const precos = {};
   COMBUSTIVEIS.forEach(c => {
     const id = 'precoPagar_' + c.replace(/\s/g, '_');
     const el = document.getElementById(id);
     precos[c] = el ? Number(el.value) || 0 : 0;
   });
-  savePrecosPagar(precos);
-  showToast('Preços salvos com sucesso!');
-  document.getElementById('formPreco').style.display = 'none';
+  const lista = getPrecosPagar();
+  lista.push({ data: dataPreco, distribuidora: distrib, precos, criadoEm: new Date().toISOString() });
+  savePrecosPagar(lista);
+  showToast('Pre\u00e7os salvos com sucesso!');
+  renderFormPreco();
+}
+
+function removerPrecoPagar(idx) {
+  if (!confirm('Remover este registro de pre\u00e7o?')) return;
+  const lista = getPrecosPagar();
+  lista.splice(idx, 1);
+  savePrecosPagar(lista);
+  renderFormPreco();
+  showToast('Registro removido!');
 }
 
 function salvarCaminhao() {
@@ -2093,20 +2121,50 @@ function removerCaminhao(idx) {
 
 
 
+function formatVolInput(el) {
+  let v = el.value.replace(/\D/g, '');
+  if (v) el.value = Number(v).toLocaleString('pt-BR');
+  else el.value = '';
+}
+
+function getBasesCarregamento() { return JSON.parse(localStorage.getItem('ctrl_estoque_bases') || '[]'); }
+function saveBasesCarregamento(arr) { localStorage.setItem('ctrl_estoque_bases', JSON.stringify(arr)); }
+
+function cadastrarBaseCarregamento() {
+  const nome = prompt('Nome da Base de Carregamento:');
+  if (!nome || !nome.trim()) return;
+  const bases = getBasesCarregamento();
+  const nomeUp = nome.trim().toUpperCase();
+  if (bases.find(b => b.toUpperCase() === nomeUp)) { showToast('Base já cadastrada!', 'error'); return; }
+  bases.push(nomeUp);
+  saveBasesCarregamento(bases);
+  showToast('Base cadastrada!');
+  populateSelectBases();
+}
+
+function populateSelectBases() {
+  const sel = document.getElementById('distBase');
+  if (!sel) return;
+  const valAtual = sel.value;
+  sel.innerHTML = '<option value="">Selecione</option>';
+  getBasesCarregamento().sort().forEach(b => {
+    sel.innerHTML += `<option value="${b}">${b}</option>`;
+  });
+  if (valAtual) sel.value = valAtual;
+}
+
 function salvarDistribuidora() {
   const razao = document.getElementById('distRazao').value.trim();
   const cnpj = document.getElementById('distCNPJ').value.trim();
-  const telefone = document.getElementById('distTelefone').value.trim();
-  const contato = document.getElementById('distContato').value.trim();
+  const base = document.getElementById('distBase').value;
   if (!razao) { showToast('Informe a razão social!', 'error'); return; }
   const distribs = getDistribuidoras();
   if (distribs.find(d => d.razao.toLowerCase() === razao.toLowerCase())) { showToast('Distribuidora já cadastrada!', 'error'); return; }
-  distribs.push({ razao, cnpj, telefone, contato });
+  distribs.push({ razao, cnpj, base });
   saveDistribuidoras(distribs);
   document.getElementById('distRazao').value = '';
   document.getElementById('distCNPJ').value = '';
-  document.getElementById('distTelefone').value = '';
-  document.getElementById('distContato').value = '';
+  document.getElementById('distBase').value = '';
   document.getElementById('formDistribuidora').style.display = 'none';
   showToast('Distribuidora cadastrada!');
   renderFechamentoCarga();
@@ -2125,7 +2183,6 @@ function salvarFechamentoCarga() {
   const dataCarga = document.getElementById('fchData').value;
   const distrib = document.getElementById('fchDistribuidora').value;
   const postoNome = document.getElementById('fchPosto').value;
-  const nf = document.getElementById('fchNF').value.trim();
   const placa = document.getElementById('fchPlaca').value.trim();
   const motorista = document.getElementById('fchMotorista').value.trim();
 
@@ -2151,7 +2208,7 @@ function salvarFechamentoCarga() {
 
   tanques.forEach((tq, i) => {
     const el = document.getElementById('fchVol_' + i);
-    const vol = el ? Number(el.value) || 0 : 0;
+    const vol = el ? Number(String(el.value).replace(/\./g, '').replace(',', '.')) || 0 : 0;
     if (vol > 0) {
       tanquesCarregados.push({ idx: i, nome: tq.nome, combustivel: tq.combustivel, volume: vol });
       totalVolume += vol;
@@ -2167,7 +2224,7 @@ function salvarFechamentoCarga() {
   fechamentos.push({
     data: dataCarga, posto: postoNome, distribuidora: distrib,
     precosProduto, tanques: tanquesCarregados, totalVolume,
-    nf, placa, motorista, criadoEm: new Date().toISOString()
+    placa, motorista, criadoEm: new Date().toISOString()
   });
   saveFechamentos(fechamentos);
 
@@ -2199,7 +2256,6 @@ function salvarFechamentoCarga() {
     const el = document.getElementById('fchVol_' + i);
     if (el) el.value = '';
   });
-  document.getElementById('fchNF').value = '';
   document.getElementById('fchPlaca').value = '';
   document.getElementById('fchMotorista').value = '';
 
@@ -2239,6 +2295,7 @@ function renderFechamentoCarga() {
       selPosto.innerHTML += `<option value="${nome}">${nome}</option>`;
     });
     if (valAtual) selPosto.value = valAtual;
+    else if (currentPosto && allData.postos[currentPosto]) selPosto.value = currentPosto;
   }
 
   // Data padrão
@@ -2274,9 +2331,9 @@ function renderFechamentoCarga() {
   // Lista de distribuidoras
   let htmlDist = '';
   if (distribs.length > 0) {
-    htmlDist = '<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>Razão Social</th><th>CNPJ</th><th>Telefone</th><th>Contato</th><th class="text-center">Ação</th></tr></thead><tbody>';
+    htmlDist = '<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>Razão Social</th><th>CNPJ</th><th>Base de Carregamento</th><th class="text-center">Ação</th></tr></thead><tbody>';
     distribs.forEach((d, i) => {
-      htmlDist += `<tr><td>${d.razao}</td><td>${d.cnpj || '—'}</td><td>${d.telefone || '—'}</td><td>${d.contato || '—'}</td><td class="text-center"><button class="btn btn-danger btn-sm" onclick="removerDistribuidora(${i})">Remover</button></td></tr>`;
+      htmlDist += `<tr><td>${d.razao}</td><td>${d.cnpj || '—'}</td><td>${d.base || '—'}</td><td class="text-center"><button class="btn btn-danger btn-sm" onclick="removerDistribuidora(${i})">Remover</button></td></tr>`;
     });
     htmlDist += '</tbody></table></div>';
   }
@@ -2344,26 +2401,23 @@ function onFchPostoChange() {
   const tanques = posto.tanques || [];
   const combustiveisUnicos = [...new Set(tanques.map(t => t.combustivel))];
 
-  // Preços por produto
-  let htmlPrecos = '<div class="form-title" style="font-size:.9rem;margin-bottom:10px;">💰 Valor por Produto (R$/L)</div>';
-  htmlPrecos += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">';
-  combustiveisUnicos.forEach(c => {
-    const id = 'fchPreco_' + c.replace(/\s/g, '_');
-    htmlPrecos += `<div class="form-group">
-      <label>${fuelTag(c, true)} ${c}</label>
-      <input type="number" id="${id}" placeholder="0,00" min="0" step="0.01">
-    </div>`;
-  });
-  htmlPrecos += '</div>';
-  if (precosDiv) precosDiv.innerHTML = htmlPrecos;
+  // Preços por produto - não duplicar aqui, já tem no botão Cadastrar Preço
+  if (precosDiv) precosDiv.innerHTML = '';
 
   // Tanques para volume
-  let htmlTanques = '<div class="form-title" style="font-size:.9rem;margin-bottom:10px;">🚢 Volume Carregado por Tanque (L)</div>';
-  htmlTanques += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
+  let htmlTanques = '<div class="form-title" style="font-size:.9rem;margin-bottom:10px;">🚢 Volume Carregado por Tanque</div>';
+  htmlTanques += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
   tanques.forEach((tq, i) => {
-    htmlTanques += `<div class="form-group">
-      <label>${fuelTag(tq.combustivel, true)} ${tq.nome} <span style="color:var(--muted);font-size:.65rem;">(Cap: ${Number(tq.capacidade).toLocaleString('pt-BR')} L)</span></label>
-      <input type="number" id="fchVol_${i}" placeholder="0" min="0" step="1">
+    const capM3 = (Number(tq.capacidade) / 1000).toLocaleString('pt-BR', {maximumFractionDigits:1});
+    htmlTanques += `<div style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:.82rem;margin-bottom:2px;">${fuelTag(tq.combustivel, true)} ${tq.nome}</div>
+        <div style="color:var(--muted);font-size:.7rem;">Capacidade: ${capM3} m³ (${Number(tq.capacidade).toLocaleString('pt-BR')} L)</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input type="text" id="fchVol_${i}" placeholder="0" inputmode="numeric" style="width:80px;text-align:center;padding:6px 4px;font-size:.85rem;font-weight:700;color:#fff;" oninput="formatVolInput(this)">
+        <span style="color:var(--muted);font-size:.75rem;font-weight:600;">L</span>
+      </div>
     </div>`;
   });
   htmlTanques += '</div>';
